@@ -1,0 +1,175 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-rose: #f8e8e8;
+  --color-rose-dark: #e8d4d4;
+  --color-champagne: #f5f0eb;
+  --color-cream: #fdf8f5;
+  --color-charcoal: #1a1a1a;
+  --color-gold: #c9a227;
+  --color-gold-light: #e5c76b;
+  --color-gold-dark: #9a7b1a;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+
+body {
+  background-color: var(--color-cream);
+  color: var(--color-charcoal);
+}
+
+/* Luxury scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: #fce8e8;
+}
+
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, var(--color-gold-light), var(--color-gold));
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gold-dark);
+}
+
+/* Auto-scroll animation */
+@keyframes scroll {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.animate-scroll {
+  animation: scroll 35s linear infinite;
+}
+
+.animate-scroll:hover {
+  animation-play-state: paused;
+}
+
+/* Hero zoom */
+@keyframes slow-zoom {
+  0%, 100% { transform: scale(1.08); }
+  50% { transform: scale(1.12); }
+}
+
+.animate-slow-zoom {
+  animation: slow-zoom 10s ease-in-out infinite;
+}
+
+/* Fade in up */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+/* Shimmer */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-shimmer {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+}
+
+/* Glass effect */
+.glass {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* Blosm logo - gold metallic gradient */
+.logo-blosm {
+  background: linear-gradient(135deg, #F9F0A0 0%, #D4AF37 35%, #AA8A2E 70%, #8B6914 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.logo-blosm-dark {
+  background: linear-gradient(135deg, #F9F0A0 0%, #D4AF37 35%, #AA8A2E 70%, #8B6914 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.logo-tagline {
+  font-family: var(--font-dm-sans), system-ui, sans-serif;
+  letter-spacing: 0.35em;
+  font-size: 0.6em;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+/* Login modal animation */
+@keyframes modalBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes modalContentIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-backdrop {
+  animation: modalBackdropIn 0.3s ease-out forwards;
+}
+
+.animate-modal-content {
+  animation: modalContentIn 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes modalBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes modalContentOut {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.98) translateY(8px);
+  }
+}
+
+.animate-modal-backdrop-out {
+  animation: modalBackdropOut 0.25s ease-in forwards;
+}
+
+.animate-modal-content-out {
+  animation: modalContentOut 0.25s ease-in forwards;
+}

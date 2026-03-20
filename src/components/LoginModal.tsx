@@ -1,0 +1,298 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useLoginModal } from "@/context/LoginModalContext";
+import { sendOtp, verifyOtp } from "@/lib/api";
+
+const countries = [
+  { code: "+61", country: "Australia", flag: "🇦🇺" },
+  { code: "+91", country: "India", flag: "🇮🇳" },
+  { code: "+1", country: "USA/Canada", flag: "🇺🇸" },
+  { code: "+44", country: "UK", flag: "🇬🇧" },
+  { code: "+971", country: "UAE", flag: "🇦🇪" },
+  { code: "+64", country: "New Zealand", flag: "🇳🇿" },
+  { code: "+65", country: "Singapore", flag: "🇸🇬" },
+  { code: "+60", country: "Malaysia", flag: "🇲🇾" },
+];
+
+export default function LoginModal() {
+  const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
+  const router = useRouter();
+  const [mobile, setMobile] = useState("");
+  const [countryCode, setCountryCode] = useState("+61");
+  const [otp, setOtp] = useState("");
+  const [step, setStep] = useState<"mobile" | "otp" | "success">("mobile");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const scrollPosRef = useRef(0);
+
+  useEffect(() => {
+    if (isOpen) {
+      setMounted(true);
+      setClosing(false);
+      return;
+    }
+    setClosing(true);
+    const t = setTimeout(() => setMounted(false), 280);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (mounted && isOpen) {
+      scrollPosRef.current = window.scrollY;
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${scrollPosRef.current}px`;
+      document.body.style.left = "0";
+      document.body.style.right = "0";
+    } else {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+      window.scrollTo(0, scrollPosRef.current);
+    }
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.top = "";
+      document.body.style.left = "";
+      document.body.style.right = "";
+    };
+  }, [mounted, isOpen]);
+
+  const handleClose = () => {
+    closeLogin();
+    setStep("mobile");
+    setMobile("");
+    setOtp("");
+    setError("");
+  };
+
+  const handleSuccessClose = () => {
+    if (redirectAfterLogin) {
+      router.push(redirectAfterLogin);
+      setRedirectAfterLogin(null);
+    }
+    handleClose();
+  };
+
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const digits = mobile.replace(/\D/g, "");
+    if (!mobile || digits.length < 9) {
+      setError("Please enter a valid mobile number");
+      return;
+    }
+    setLoading(true);
+    try {
+      await sendOtp(mobile.replace(/\D/g, ""), countryCode);
+      setStep("otp");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to send OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (!otp || otp.length !== 6) {
+      setError("Please enter the 6-digit OTP");
+      return;
+    }
+    setLoading(true);
+    try {
+      const { token, user } = await verifyOtp(mobile.replace(/\D/g, ""), countryCode, otp);
+      setAuth(token, user);
+      setStep("success");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invalid or expired OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!mounted) return null;
+
+  const fullNumber = `${countryCode} ${mobile}`;
+
+  return (
+    <div
+      className={`fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md ${closing ? "animate-modal-backdrop-out" : "animate-modal-backdrop"}`}
+      onClick={(e) => e.target === e.currentTarget && handleClose()}
+    >
+      <div
+        className={`bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden ring-1 ring-black/5 ${closing ? "animate-modal-content-out" : "animate-modal-content"}`}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {step === "mobile" && (
+          <div className="flex flex-col md:flex-row min-h-[440px]">
+            {/* Left - Branding + Image */}
+            <div className="md:w-2/5 relative bg-gradient-to-br from-rose-50 via-amber-50/80 to-rose-100/60 p-8 md:p-10 flex flex-col justify-between overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-rose-200/30 rounded-full blur-xl translate-y-1/2 -translate-x-1/2" />
+              <div className="relative">
+                <h2 className="font-display text-3xl md:text-4xl font-bold uppercase logo-blosm tracking-tight">
+                  BLOSM
+                </h2>
+                <p className="text-sm uppercase tracking-[0.35em] text-charcoal font-bold mt-2">
+                  Hair & Beauty
+                </p>
+              </div>
+              <div className="hidden md:block mt-8 rounded-2xl overflow-hidden aspect-[4/5] max-h-[280px] shadow-lg ring-1 ring-black/5">
+                <img
+                  src="https://images.unsplash.com/photo-1562322140-8baeececf3df?w=400&q=85"
+                  alt="Blosm Salon"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+            {/* Right - Form */}
+            <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center bg-white">
+              <div className="flex items-center justify-between mb-8">
+                <h3 className="font-display text-2xl font-light text-charcoal">Welcome back</h3>
+                <button
+                  onClick={handleClose}
+                  className="p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100 transition-all"
+                  aria-label="Close"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <form onSubmit={handleSendOtp} className="space-y-5">
+                <div>
+                  <label htmlFor="login-mobile" className="block text-sm font-medium text-charcoal mb-2">
+                    Enter your mobile number
+                  </label>
+                  <div className="flex gap-2">
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      className="px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white min-w-[100px]"
+                    >
+                      {countries.map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.flag} {c.code}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      id="login-mobile"
+                      type="tel"
+                      required
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      placeholder="410 123 456"
+                      className="flex-1 px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+                    />
+                  </div>
+                </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-amber-500/20"
+                >
+                  {loading ? "Sending OTP..." : "Send OTP"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {step === "otp" && (
+          <div className="p-8 md:p-12 max-w-md mx-auto">
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h2 className="font-display text-2xl font-medium text-charcoal">Verify OTP</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Sent to <span className="font-medium text-charcoal">{fullNumber}</span>
+                </p>
+              </div>
+              <button
+                onClick={handleClose}
+                className="p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100"
+                aria-label="Close"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleVerifyOtp} className="space-y-5">
+              <div>
+                <label htmlFor="login-otp" className="block text-sm font-medium text-charcoal mb-2">
+                  Enter 6-digit code
+                </label>
+                <input
+                  id="login-otp"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                  placeholder="000000"
+                  className="w-full px-4 py-4 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-center text-2xl tracking-[0.5em] font-medium"
+                />
+              </div>
+              {error && <p className="text-sm text-red-600">{error}</p>}
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-xl transition-all"
+              >
+                {loading ? "Verifying..." : "Verify & Login"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setStep("mobile")}
+                className="w-full text-sm text-gray-500 hover:text-amber-700 transition-colors"
+              >
+                Change number
+              </button>
+            </form>
+          </div>
+        )}
+
+        {step === "success" && (
+          <div className="relative p-12 text-center max-w-sm mx-auto">
+            <button
+              onClick={handleSuccessClose}
+              className="absolute top-6 right-6 p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100"
+              aria-label="Close"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h2 className="font-display text-2xl font-medium text-charcoal mb-2">You&apos;re in!</h2>
+            <p className="text-gray-600 mb-8">Welcome to Blosm Hair & Beauty.</p>
+            <button
+              onClick={handleSuccessClose}
+              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
