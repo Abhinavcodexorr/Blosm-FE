@@ -25,14 +25,58 @@ export async function verifyOtp(mobile: string, countryCode: string, otp: string
   return { token, user };
 }
 
-export async function getProfile(token: string) {
+/** Matches backend `toPublicUser` (verify-otp + GET /users/me). */
+export type PublicUser = {
+  _id: string;
+  mobile: string;
+  countryCode: string;
+  name: string | null;
+  email: string | null;
+  wallet: number;
+};
+
+function parsePublicUser(raw: unknown): PublicUser {
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Invalid profile response");
+  }
+  const o = raw as Record<string, unknown>;
+  const walletRaw = o.wallet;
+  const wallet =
+    typeof walletRaw === "number" && Number.isFinite(walletRaw)
+      ? walletRaw
+      : typeof walletRaw === "string" && walletRaw !== ""
+        ? Number(walletRaw) || 0
+        : 0;
+  return {
+    _id: String(o._id ?? ""),
+    mobile: String(o.mobile ?? ""),
+    countryCode: String(o.countryCode ?? ""),
+    name: o.name == null || o.name === "" ? null : String(o.name),
+    email: o.email == null || o.email === "" ? null : String(o.email),
+    wallet,
+  };
+}
+
+export async function getProfile(token: string): Promise<PublicUser> {
   const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
     headers: { Authorization: `Bearer ${token}` },
     credentials: "include",
   });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || "Failed to fetch profile");
-  return data;
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json.error || json.message || "Failed to fetch profile");
+  }
+  if (json.success === false) {
+    throw new Error(json.message || json.error?.message || "Failed to fetch profile");
+  }
+  const payload = json.data !== undefined ? json.data : json;
+  let userPayload: unknown = payload;
+  if (payload && typeof payload === "object" && "user" in payload && (payload as { user: unknown }).user != null) {
+    userPayload = (payload as { user: unknown }).user;
+  } else if (json.user != null && payload === json) {
+    userPayload = json.user;
+  }
+  return parsePublicUser(userPayload);
 }
 
 export type BookAppointmentBody = {

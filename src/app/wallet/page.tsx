@@ -1,9 +1,11 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { getProfile } from "@/lib/api";
 
 function formatWalletAud(value: number) {
   const n = Number.isFinite(value) ? value : 0;
@@ -16,7 +18,28 @@ function formatWalletAud(value: number) {
 }
 
 export default function WalletPage() {
-  const { token, user, openLogin } = useLoginModal();
+  const { token, user, openLogin, setAuth } = useLoginModal();
+  const [profileRefreshing, setProfileRefreshing] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+    setProfileRefreshing(true);
+    getProfile(token)
+      .then((fresh) => {
+        if (cancelled) return;
+        setAuth(token, fresh);
+      })
+      .catch(() => {
+        /* keep existing session user if /me fails */
+      })
+      .finally(() => {
+        if (!cancelled) setProfileRefreshing(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, setAuth]);
 
   return (
     <main className="min-h-screen">
@@ -59,11 +82,16 @@ export default function WalletPage() {
               </div>
 
               <div className="bg-white rounded-2xl border border-amber-100/80 shadow-lg shadow-amber-100/50 overflow-hidden">
-                <div className="bg-gradient-to-br from-amber-500 to-amber-600 px-6 py-8 text-white">
+                <div className="bg-gradient-to-br from-amber-500 to-amber-600 px-6 py-8 text-white relative">
                   <p className="text-sm font-medium text-amber-100/90 mb-1">Available balance</p>
-                  <p className="font-display text-4xl md:text-5xl font-light tracking-tight">
+                  <p
+                    className={`font-display text-4xl md:text-5xl font-light tracking-tight transition-opacity ${profileRefreshing ? "opacity-70" : ""}`}
+                  >
                     {formatWalletAud(user?.wallet ?? 0)}
                   </p>
+                  {profileRefreshing && (
+                    <p className="text-xs text-amber-100/80 mt-2">Syncing with your account…</p>
+                  )}
                 </div>
                 <div className="px-6 py-6 space-y-4">
                   <p className="text-sm text-gray-600 leading-relaxed">

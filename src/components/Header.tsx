@@ -100,6 +100,16 @@ export default function Header() {
     return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
   }
 
+  const formatWalletAud = (value: number | undefined) => {
+    const n = typeof value === 'number' && Number.isFinite(value) ? value : 0
+    return new Intl.NumberFormat('en-AU', {
+      style: 'currency',
+      currency: 'AUD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(n)
+  }
+
   return (
     <header className={`fixed top-0 left-0 right-0 z-50 ${headerBg} border-b ${borderClass} transition-all duration-300`}>
       <nav className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
@@ -173,25 +183,48 @@ export default function Header() {
               </button>
             )}
             {profileOpen && token && (
-              <div className={`absolute right-0 top-full mt-2 w-80 rounded-xl shadow-xl border overflow-hidden ${isOverHero ? 'bg-white border-gray-200' : 'bg-white border-gray-200'}`}>
-                <div className="p-4 border-b border-gray-100">
-                  <p className="font-medium text-charcoal truncate">{user?.name || 'My Account'}</p>
-                  <p className="text-sm text-gray-500 truncate">{user?.mobile ? `${user.countryCode || ''} ${user.mobile}` : user?.email || ''}</p>
-                </div>
-                <div className="max-h-64 overflow-y-auto">
-                  <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">My Appointments</div>
+              <div className="absolute right-0 top-full mt-2 w-80 rounded-xl shadow-xl border overflow-hidden bg-white border-gray-200">
+                <Link
+                  href="/profile"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-amber-50/60 transition-colors border-b border-gray-100"
+                >
+                  <span className="text-sm font-semibold text-charcoal">Profile</span>
+                  <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+
+                <div className="max-h-52 overflow-y-auto border-b border-gray-100">
+                  <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em]">
+                    Appointments
+                  </div>
                   {appointmentsLoading ? (
-                    <p className="px-4 py-6 text-sm text-gray-500 text-center">Loading…</p>
+                    <p className="px-4 py-5 text-sm text-gray-500 text-center">Loading…</p>
                   ) : appointments.length === 0 ? (
-                    <p className="px-4 py-6 text-sm text-gray-500 text-center">No appointments yet</p>
+                    <p className="px-4 py-5 text-sm text-gray-500 text-center">No appointments yet</p>
                   ) : (
                     <ul className="pb-2">
                       {appointments.map((apt) => (
-                        <li key={apt._id || apt.date + apt.time} className="px-4 py-3 hover:bg-amber-50/50 border-b border-gray-50 last:border-0">
+                        <li
+                          key={apt._id || String(apt.date) + String(apt.time)}
+                          className="px-4 py-2.5 hover:bg-amber-50/50 border-t border-gray-50 first:border-t-0"
+                        >
                           <p className="text-sm font-medium text-charcoal">{apt.service || 'Appointment'}</p>
-                          <p className="text-xs text-gray-500">{formatDate(apt.date)}{apt.time ? ` at ${apt.time}` : ''}</p>
+                          <p className="text-xs text-gray-500">
+                            {formatDate(apt.date)}
+                            {apt.time ? ` at ${apt.time}` : ''}
+                          </p>
                           {apt.status && (
-                            <span className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${apt.status === 'confirmed' ? 'bg-green-100 text-green-800' : apt.status === 'completed' ? 'bg-gray-100 text-gray-600' : 'bg-amber-100 text-amber-800'}`}>
+                            <span
+                              className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${
+                                apt.status === 'confirmed'
+                                  ? 'bg-green-100 text-green-800'
+                                  : apt.status === 'completed'
+                                    ? 'bg-gray-100 text-gray-600'
+                                    : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
                               {apt.status}
                             </span>
                           )}
@@ -200,9 +233,23 @@ export default function Header() {
                     </ul>
                   )}
                 </div>
-                <div className="p-2 border-t border-gray-100">
+
+                <Link
+                  href="/wallet"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-amber-50/60 transition-colors border-b border-gray-100"
+                >
+                  <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] shrink-0">Wallet</span>
+                  <span className="text-base font-semibold text-amber-800 tabular-nums">{formatWalletAud(user?.wallet)}</span>
+                </Link>
+
+                <div className="p-2">
                   <button
-                    onClick={() => { logout(); setProfileOpen(false); }}
+                    type="button"
+                    onClick={() => {
+                      logout()
+                      setProfileOpen(false)
+                    }}
                     className="w-full py-2 text-sm font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
                   >
                     Logout
@@ -242,51 +289,49 @@ export default function Header() {
                 </Link>
               </li>
             ))}
-            {token && (
-              <li>
-                <Link
-                  href="/wallet"
-                  className={`block text-sm font-medium ${
-                    pathname === '/wallet' ? 'text-amber-800' : 'text-charcoal-600 hover:text-amber-800'
-                  }`}
-                  onClick={() => setMobileMenuOpen(false)}
-                >
-                  Wallet
-                </Link>
-              </li>
-            )}
             {token ? (
               <>
                 <li className="pt-2 border-t border-gray-100">
-                  <div className="flex items-start gap-3 mb-4 pb-3 border-b border-gray-100 text-charcoal-600">
-                    <span className="shrink-0 text-amber-800 pt-0.5">
-                      <ProfileOutlineIcon />
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="font-display text-base font-medium text-charcoal truncate">
-                        {user?.name || 'Welcome'}
-                      </p>
-                      <p className="text-xs text-gray-500 truncate">
-                        {user?.mobile ? `${user.countryCode || ''} ${user.mobile}` : user?.email || 'Signed in'}
-                      </p>
-                    </div>
-                  </div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">My Appointments</p>
+                  <Link
+                    href="/profile"
+                    className="flex items-center justify-between gap-2 text-sm font-semibold text-charcoal-600 hover:text-amber-800 py-1 mb-3"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Profile
+                    <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-2">Appointments</p>
                   {appointmentsLoading ? (
-                    <p className="text-sm text-gray-500">Loading…</p>
+                    <p className="text-sm text-gray-500 mb-4">Loading…</p>
                   ) : appointments.length === 0 ? (
-                    <p className="text-sm text-gray-500">No appointments yet</p>
+                    <p className="text-sm text-gray-500 mb-4">No appointments yet</p>
                   ) : (
-                    <ul className="space-y-2">
+                    <ul className="space-y-2 mb-4">
                       {appointments.slice(0, 5).map((apt) => (
-                        <li key={apt._id || apt.date + apt.time} className="text-sm text-charcoal-600">
+                        <li key={apt._id || String(apt.date) + String(apt.time)} className="text-sm text-charcoal-600">
                           <span className="font-medium">{apt.service || 'Appointment'}</span>
-                          <span className="text-gray-500 ml-1">{formatDate(apt.date)}{apt.time ? ` at ${apt.time}` : ''}</span>
+                          <span className="text-gray-500 ml-1">
+                            {formatDate(apt.date)}
+                            {apt.time ? ` at ${apt.time}` : ''}
+                          </span>
                         </li>
                       ))}
-                      {appointments.length > 5 && <p className="text-xs text-gray-500">+{appointments.length - 5} more</p>}
+                      {appointments.length > 5 && (
+                        <p className="text-xs text-gray-500">+{appointments.length - 5} more</p>
+                      )}
                     </ul>
                   )}
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-2">Wallet</p>
+                  <Link
+                    href="/wallet"
+                    className="flex items-center justify-between gap-2 py-2 px-3 -mx-1 rounded-lg bg-amber-50/80 border border-amber-100/80 text-amber-900 hover:bg-amber-100/80 transition-colors mb-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <span className="text-sm font-medium">Balance</span>
+                    <span className="text-base font-semibold tabular-nums">{formatWalletAud(user?.wallet)}</span>
+                  </Link>
                 </li>
                 <li>
                   <button
