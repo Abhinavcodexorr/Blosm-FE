@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import Link from "next/link";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -33,12 +32,6 @@ export default function ContactPage() {
               <p className="text-gray-600 mb-8">
                 Thank you, {name}. We&apos;ll get back to you shortly at {email}.
               </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-amber-500 text-white font-medium hover:bg-amber-600 rounded-lg transition-colors"
-              >
-                Back to Home
-              </Link>
             </div>
           </div>
         </section>
@@ -165,12 +158,6 @@ export default function ContactPage() {
               </form>
             </div>
           </div>
-
-          <p className="mt-12 text-center">
-            <Link href="/" className="text-amber-700 hover:text-amber-800 font-medium">
-              ← Back to Home
-            </Link>
-          </p>
         </div>
       </section>
       <Footer />

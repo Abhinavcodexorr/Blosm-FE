@@ -15,7 +15,7 @@ const images = [
 
 export default function Gallery() {
   return (
-    <section className="pt-12 md:pt-16 pb-24 md:pb-36 bg-white overflow-hidden">
+    <section className="pt-12 md:pt-16 pb-8 md:pb-10 bg-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         <ScrollReveal direction="up">
           <div className="text-center mb-20">

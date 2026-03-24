@@ -25,7 +25,7 @@ const testimonials = [
 
 export default function Testimonials() {
   return (
-    <section className="py-24 md:py-36 bg-gradient-to-b from-rose-50 to-white overflow-hidden">
+    <section className="pt-10 md:pt-12 pb-20 md:pb-28 bg-gradient-to-b from-rose-50 to-white overflow-hidden">
       <div className="max-w-7xl mx-auto px-6">
         <ScrollReveal direction="up">
           <div className="text-center mb-20">
@@ -41,19 +41,26 @@ export default function Testimonials() {
           </div>
         </ScrollReveal>
 
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-8 items-stretch">
           {testimonials.map((testimonial, index) => (
-            <ScrollReveal key={index} direction="up" delay={index * 100}>
-              <div className="bg-white p-10 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
-                <div className="flex gap-1 mb-6">
+            <ScrollReveal
+              key={index}
+              direction="up"
+              delay={index * 100}
+              className="h-full min-h-0"
+            >
+              <div className="h-full flex flex-col bg-white p-8 md:p-10 rounded-2xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow duration-300">
+                <div className="flex gap-1 shrink-0 mb-5">
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <span key={i} className="text-amber-500 text-xl">★</span>
+                    <span key={i} className="text-amber-500 text-xl leading-none">
+                      ★
+                    </span>
                   ))}
                 </div>
-                <blockquote className="text-gray-600 leading-relaxed mb-8 text-lg">
+                <blockquote className="flex-1 text-gray-600 leading-relaxed text-base md:text-lg min-h-0">
                   &ldquo;{testimonial.quote}&rdquo;
                 </blockquote>
-                <div>
+                <div className="shrink-0 pt-6 mt-auto border-t border-gray-100">
                   <span className="font-semibold text-charcoal">{testimonial.author}</span>
                   <span className="text-gray-400 ml-2">• {testimonial.location}</span>
                 </div>

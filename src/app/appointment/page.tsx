@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import Link from "next/link";
 import { getServicesForBooking } from "@/services/api";
 import { bookAppointment, getAvailableSlots } from "@/lib/api";
 import { useLoginModal } from "@/context/LoginModalContext";
@@ -115,12 +114,6 @@ export default function AppointmentPage() {
               <p className="text-gray-600 mb-8">
                 Thank you, {name}. We&apos;ll contact you shortly at {mobile} to confirm your {serviceTitle || "appointment"}{date ? ` on ${date}${time ? ` at ${time}` : ""}` : ""}.
               </p>
-              <Link
-                href="/"
-                className="inline-flex items-center gap-2 px-8 py-4 bg-amber-500 text-white font-medium hover:bg-amber-600 rounded-lg transition-colors"
-              >
-                Back to Home
-              </Link>
             </div>
           </div>
         </section>
@@ -257,12 +250,6 @@ export default function AppointmentPage() {
               {submitting ? "Booking…" : "Request Appointment"}
             </button>
           </form>
-
-          <p className="mt-8 text-center">
-            <Link href="/" className="text-amber-700 hover:text-amber-800 font-medium">
-              ← Back to Home
-            </Link>
-          </p>
         </div>
       </section>
       <Footer />

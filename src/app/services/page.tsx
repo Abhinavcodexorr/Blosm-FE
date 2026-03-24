@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
-import Link from "next/link";
 import LazyImage from "@/components/LazyImage";
 import { getCategories } from "@/services/api";
 import { useLoginModal } from "@/context/LoginModalContext";
@@ -71,28 +70,28 @@ export default function ServicesPage() {
                       </li>
                     ))}
                   </ul>
-                  <button
-                    type="button"
-                    onClick={() => handleBookNow(service.name)}
-                    className="inline-flex items-center gap-2 mt-8 text-amber-700 font-semibold hover:text-amber-800 transition-colors"
-                  >
-                    Book Now
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                    </svg>
-                  </button>
+                  <div className="mt-8 flex w-full justify-end border-t border-gray-100 pt-6">
+                    <button
+                      type="button"
+                      onClick={() => handleBookNow(service.name)}
+                      className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-amber-500/25 transition-all duration-200 hover:from-amber-600 hover:to-amber-700 hover:shadow-lg hover:shadow-amber-500/30 active:scale-[0.98] focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2 group/btn"
+                    >
+                      Book Now
+                      <svg
+                        className="h-4 w-4 transition-transform duration-200 group-hover/btn:translate-x-0.5"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={2.25}
+                        viewBox="0 0 24 24"
+                        aria-hidden
+                      >
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
-          </div>
-
-          <div className="mt-16 text-center">
-            <Link
-              href="/"
-              className="inline-flex items-center gap-2 text-rose-700 hover:text-rose-800 font-medium"
-            >
-              ← Back to Home
-            </Link>
           </div>
             </div>
           )}

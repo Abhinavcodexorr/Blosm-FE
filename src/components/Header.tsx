@@ -22,6 +22,25 @@ type Appointment = {
   [key: string]: unknown;
 };
 
+/** Outline user mark: round head + shoulders, balanced for ~22–24px display */
+function ProfileOutlineIcon({ className = 'h-6 w-6 shrink-0' }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      fill="none"
+      viewBox="0 0 24 24"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <circle cx="12" cy="8" r="3.25" />
+      <path d="M6.5 20.25v-.75a5.5 5.5 0 0 1 5.5-5.5h0a5.5 5.5 0 0 1 5.5 5.5v.75" />
+    </svg>
+  )
+}
+
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
@@ -103,15 +122,46 @@ export default function Header() {
               </Link>
             </li>
           ))}
+          {token && (
+            <li>
+              <Link
+                href="/wallet"
+                className={`text-sm font-medium transition-colors ${
+                  pathname === '/wallet'
+                    ? isOverHero
+                      ? 'text-amber-200'
+                      : 'text-amber-800'
+                    : linkClass
+                }`}
+              >
+                Wallet
+              </Link>
+            </li>
+          )}
           <li className="relative" ref={profileRef}>
             {token ? (
               <button
+                type="button"
                 onClick={() => setProfileOpen(!profileOpen)}
-                className={`flex items-center justify-center w-9 h-9 rounded-full border-2 transition-colors ${isOverHero ? 'border-white/80 text-white hover:bg-white/20' : 'border-charcoal-600/60 text-charcoal-600 hover:bg-charcoal-50'}`}
-                aria-label="Profile"
+                aria-label="Account menu"
+                aria-expanded={profileOpen}
+                aria-haspopup="true"
+                className={`flex items-center gap-1 rounded-lg px-2 py-1.5 -mr-1 transition-all duration-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 focus-visible:ring-offset-2 ${
+                  isOverHero
+                    ? 'text-white/95 hover:bg-white/15 hover:text-white focus-visible:ring-offset-transparent'
+                    : 'text-charcoal-700 hover:bg-amber-50/90 hover:text-amber-900 focus-visible:ring-offset-white'
+                }`}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                <ProfileOutlineIcon />
+                <svg
+                  className={`h-3.5 w-3.5 shrink-0 opacity-75 transition-transform duration-200 ${profileOpen ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2.25}
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
             ) : (
@@ -192,9 +242,35 @@ export default function Header() {
                 </Link>
               </li>
             ))}
+            {token && (
+              <li>
+                <Link
+                  href="/wallet"
+                  className={`block text-sm font-medium ${
+                    pathname === '/wallet' ? 'text-amber-800' : 'text-charcoal-600 hover:text-amber-800'
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Wallet
+                </Link>
+              </li>
+            )}
             {token ? (
               <>
                 <li className="pt-2 border-t border-gray-100">
+                  <div className="flex items-start gap-3 mb-4 pb-3 border-b border-gray-100 text-charcoal-600">
+                    <span className="shrink-0 text-amber-800 pt-0.5">
+                      <ProfileOutlineIcon />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-display text-base font-medium text-charcoal truncate">
+                        {user?.name || 'Welcome'}
+                      </p>
+                      <p className="text-xs text-gray-500 truncate">
+                        {user?.mobile ? `${user.countryCode || ''} ${user.mobile}` : user?.email || 'Signed in'}
+                      </p>
+                    </div>
+                  </div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">My Appointments</p>
                   {appointmentsLoading ? (
                     <p className="text-sm text-gray-500">Loading…</p>
