@@ -1,4 +1,5 @@
-import { getCountryDataList, getEmojiFlag, type TCountryCode } from "countries-list";
+import countriesPhone from "@/data/countriesPhone.min.json";
+import countriesEmoji from "@/data/countriesEmoji.min.json";
 
 export type CountryDialOption = {
   value: string;
@@ -7,15 +8,21 @@ export type CountryDialOption = {
   hint: string;
 };
 
+type PhoneRow = { name: string; phone: number[] };
+
 function buildOptions(): CountryDialOption[] {
   const out: Array<CountryDialOption & { _sort: string }> = [];
-  for (const c of getCountryDataList()) {
-    const iso = c.iso2 as TCountryCode;
-    const flag = getEmojiFlag(iso);
+  const phoneMap = countriesPhone as Record<string, PhoneRow>;
+  const emojiMap = countriesEmoji as Record<string, string>;
+
+  for (const iso2 of Object.keys(phoneMap)) {
+    const c = phoneMap[iso2];
+    if (!c?.phone?.length) continue;
+    const flag = emojiMap[iso2] ?? "🏳️";
     for (const p of c.phone) {
       const dial = `+${p}`;
       out.push({
-        value: `${dial}__${iso}__${p}`,
+        value: `${dial}__${iso2}__${p}`,
         dial,
         label: `${flag} ${dial}`,
         hint: `${c.name} (${dial})`,
