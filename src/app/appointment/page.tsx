@@ -6,6 +6,14 @@ import Footer from "@/components/Footer";
 import { getServicesForBooking } from "@/services/api";
 import { bookAppointment, getAvailableSlots } from "@/lib/api";
 import { useLoginModal } from "@/context/LoginModalContext";
+import PhoneCountryField from "@/components/PhoneCountryField";
+import {
+  sanitizeMobileDigits,
+  isValidMobileDigits,
+  MOBILE_DIGITS_MIN,
+  MOBILE_DIGITS_LEN,
+} from "@/lib/mobileInput";
+import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 
 type ServiceOption = { id: string; title: string };
 
@@ -13,7 +21,7 @@ export default function AppointmentPage() {
   const { token } = useLoginModal();
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
-  const [countryCode, setCountryCode] = useState("+61");
+  const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [serviceId, setServiceId] = useState("");
@@ -73,13 +81,19 @@ export default function AppointmentPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const digits = sanitizeMobileDigits(mobile);
+    if (!isValidMobileDigits(digits)) {
+      setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number.`);
+      return;
+    }
+    const countryCode = dialFromSelection(countrySelect);
     setSubmitting(true);
     const selectedService = services.find((s) => s.id === serviceId);
     try {
       await bookAppointment(
         {
           name,
-          mobile: mobile.replace(/\D/g, ""),
+          mobile: digits,
           countryCode,
           email,
           serviceId,
@@ -112,7 +126,7 @@ export default function AppointmentPage() {
               </div>
               <h1 className="font-display text-3xl font-light text-charcoal mb-4">Booking Request Received</h1>
               <p className="text-gray-600 mb-8">
-                Thank you, {name}. We&apos;ll contact you shortly at {mobile} to confirm your {serviceTitle || "appointment"}{date ? ` on ${date}${time ? ` at ${time}` : ""}` : ""}.
+                Thank you, {name}. We&apos;ll contact you shortly at {dialFromSelection(countrySelect)} {mobile} to confirm your {serviceTitle || "appointment"}{date ? ` on ${date}${time ? ` at ${time}` : ""}` : ""}.
               </p>
             </div>
           </div>
@@ -151,18 +165,15 @@ export default function AppointmentPage() {
               />
             </div>
 
-            <div>
-              <label htmlFor="mobile" className="block text-sm font-medium text-charcoal mb-2">Mobile</label>
-              <input
-                id="mobile"
-                type="tel"
-                required
-                value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
-                placeholder="e.g. 0410 123 456"
-              />
-            </div>
+            <PhoneCountryField
+              id="appt-mobile"
+              label="Mobile"
+              mobile={mobile}
+              countrySelect={countrySelect}
+              onMobileChange={setMobile}
+              onCountryChange={setCountrySelect}
+              rounded="lg"
+            />
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-charcoal mb-2">Email</label>

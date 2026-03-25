@@ -4,25 +4,38 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { sendOtp, verifyOtp } from "@/lib/api";
+import PhoneCountryField from "@/components/PhoneCountryField";
+import {
+  sanitizeMobileDigits,
+  isValidMobileDigits,
+  MOBILE_DIGITS_MIN,
+  MOBILE_DIGITS_LEN,
+} from "@/lib/mobileInput";
+import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 
-const countries = [
-  { code: "+61", country: "Australia", flag: "🇦🇺" },
-  { code: "+91", country: "India", flag: "🇮🇳" },
-  { code: "+1", country: "USA/Canada", flag: "🇺🇸" },
-  { code: "+44", country: "UK", flag: "🇬🇧" },
-  { code: "+971", country: "UAE", flag: "🇦🇪" },
-  { code: "+64", country: "New Zealand", flag: "🇳🇿" },
-  { code: "+65", country: "Singapore", flag: "🇸🇬" },
-  { code: "+60", country: "Malaysia", flag: "🇲🇾" },
-];
+function CloseModalButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100 transition-all"
+      aria-label="Close"
+    >
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
 
 export default function LoginModal() {
   const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
   const router = useRouter();
   const [mobile, setMobile] = useState("");
-  const [countryCode, setCountryCode] = useState("+61");
+  const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
+  const countryCode = dialFromSelection(countrySelect);
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"mobile" | "otp" | "success">("mobile");
+  const [step, setStep] = useState<"mobile" | "otp">("mobile");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -69,11 +82,12 @@ export default function LoginModal() {
     closeLogin();
     setStep("mobile");
     setMobile("");
+    setCountrySelect(getDefaultCountrySelectValue());
     setOtp("");
     setError("");
   };
 
-  const handleSuccessClose = () => {
+  const finishLoginAndClose = () => {
     if (redirectAfterLogin) {
       router.push(redirectAfterLogin);
       setRedirectAfterLogin(null);
@@ -84,14 +98,14 @@ export default function LoginModal() {
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const digits = mobile.replace(/\D/g, "");
-    if (!mobile || digits.length < 9) {
-      setError("Please enter a valid mobile number");
+    const digits = sanitizeMobileDigits(mobile);
+    if (!isValidMobileDigits(digits)) {
+      setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number`);
       return;
     }
     setLoading(true);
     try {
-      await sendOtp(mobile.replace(/\D/g, ""), countryCode);
+      await sendOtp(digits, countryCode);
       setStep("otp");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send OTP");
@@ -109,9 +123,9 @@ export default function LoginModal() {
     }
     setLoading(true);
     try {
-      const { token, user } = await verifyOtp(mobile.replace(/\D/g, ""), countryCode, otp);
+      const { token, user } = await verifyOtp(sanitizeMobileDigits(mobile), countryCode, otp);
       setAuth(token, user);
-      setStep("success");
+      finishLoginAndClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid or expired OTP");
     } finally {
@@ -133,7 +147,8 @@ export default function LoginModal() {
         onClick={(e) => e.stopPropagation()}
       >
         {step === "mobile" && (
-          <div className="flex flex-col md:flex-row min-h-[440px]">
+          <div className="relative flex flex-col md:flex-row min-h-[440px]">
+            <CloseModalButton onClick={handleClose} />
             {/* Left - Branding + Image */}
             <div className="md:w-2/5 relative bg-gradient-to-br from-rose-50 via-amber-50/80 to-rose-100/60 p-8 md:p-10 flex flex-col justify-between overflow-hidden">
               <div className="absolute top-0 right-0 w-32 h-32 bg-amber-200/20 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2" />
@@ -156,48 +171,21 @@ export default function LoginModal() {
             </div>
 
             {/* Right - Form */}
-            <div className="md:w-3/5 p-8 md:p-10 flex flex-col justify-center bg-white">
-              <div className="flex items-center justify-between mb-8">
+            <div className="md:w-3/5 p-8 md:p-10 pt-14 md:pt-16 flex flex-col justify-center bg-white">
+              <div className="mb-8">
                 <h3 className="font-display text-2xl font-light text-charcoal">Welcome back</h3>
-                <button
-                  onClick={handleClose}
-                  className="p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100 transition-all"
-                  aria-label="Close"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
               </div>
 
               <form onSubmit={handleSendOtp} className="space-y-5">
-                <div>
-                  <label htmlFor="login-mobile" className="block text-sm font-medium text-charcoal mb-2">
-                    Enter your mobile number
-                  </label>
-                  <div className="flex gap-2">
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      className="px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white min-w-[100px]"
-                    >
-                      {countries.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.flag} {c.code}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      id="login-mobile"
-                      type="tel"
-                      required
-                      value={mobile}
-                      onChange={(e) => setMobile(e.target.value)}
-                      placeholder="410 123 456"
-                      className="flex-1 px-4 py-3.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    />
-                  </div>
-                </div>
+                <PhoneCountryField
+                  id="login-mobile"
+                  label="Enter your mobile number"
+                  mobile={mobile}
+                  countrySelect={countrySelect}
+                  onMobileChange={setMobile}
+                  onCountryChange={setCountrySelect}
+                  rounded="xl"
+                />
                 {error && <p className="text-sm text-red-600">{error}</p>}
                 <button
                   type="submit"
@@ -212,23 +200,13 @@ export default function LoginModal() {
         )}
 
         {step === "otp" && (
-          <div className="p-8 md:p-12 max-w-md mx-auto">
-            <div className="flex justify-between items-start mb-8">
-              <div>
-                <h2 className="font-display text-2xl font-medium text-charcoal">Verify OTP</h2>
-                <p className="text-gray-600 text-sm mt-1">
-                  Sent to <span className="font-medium text-charcoal">{fullNumber}</span>
-                </p>
-              </div>
-              <button
-                onClick={handleClose}
-                className="p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100"
-                aria-label="Close"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+          <div className="relative w-full p-8 md:p-12 pt-14 md:pt-16 max-w-md mx-auto">
+            <CloseModalButton onClick={handleClose} />
+            <div className="mb-8 pr-2">
+              <h2 className="font-display text-2xl font-medium text-charcoal">Verify OTP</h2>
+              <p className="text-gray-600 text-sm mt-1">
+                Sent to <span className="font-medium text-charcoal">{fullNumber}</span>
+              </p>
             </div>
 
             <form onSubmit={handleVerifyOtp} className="space-y-5">
@@ -266,32 +244,6 @@ export default function LoginModal() {
           </div>
         )}
 
-        {step === "success" && (
-          <div className="relative p-12 text-center max-w-sm mx-auto">
-            <button
-              onClick={handleSuccessClose}
-              className="absolute top-6 right-6 p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100"
-              aria-label="Close"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <h2 className="font-display text-2xl font-medium text-charcoal mb-2">You&apos;re in!</h2>
-            <p className="text-gray-600 mb-8">Welcome to Blosm Hair & Beauty.</p>
-            <button
-              onClick={handleSuccessClose}
-              className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl transition-colors"
-            >
-              Done
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

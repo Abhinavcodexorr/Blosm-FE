@@ -3,16 +3,31 @@
 import { useState } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import PhoneCountryField from "@/components/PhoneCountryField";
+import {
+  sanitizeMobileDigits,
+  isValidMobileDigits,
+  MOBILE_DIGITS_MIN,
+  MOBILE_DIGITS_LEN,
+} from "@/lib/mobileInput";
+import { getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [mobile, setMobile] = useState("");
+  const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [formError, setFormError] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setFormError("");
+    if (!isValidMobileDigits(sanitizeMobileDigits(mobile))) {
+      setFormError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number.`);
+      return;
+    }
     setSubmitted(true);
   };
 
@@ -126,17 +141,18 @@ export default function ContactPage() {
                     placeholder="your@email.com"
                   />
                 </div>
-                <div>
-                  <label htmlFor="mobile" className="block text-sm font-medium text-charcoal mb-2">Mobile</label>
-                  <input
-                    id="mobile"
-                    type="tel"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
-                    placeholder="0410 123 456"
-                  />
-                </div>
+                <PhoneCountryField
+                  id="contact-mobile"
+                  label="Mobile"
+                  mobile={mobile}
+                  countrySelect={countrySelect}
+                  onMobileChange={setMobile}
+                  onCountryChange={setCountrySelect}
+                  rounded="lg"
+                />
+                {formError && (
+                  <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{formError}</p>
+                )}
                 <div>
                   <label htmlFor="message" className="block text-sm font-medium text-charcoal mb-2">Message</label>
                   <textarea
