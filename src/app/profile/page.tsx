@@ -6,30 +6,25 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile } from "@/lib/api";
-
-function formatWalletAud(value: number | undefined) {
-  const n = typeof value === "number" && Number.isFinite(value) ? value : 0;
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
+import { formatAud } from "@/lib/formatCurrency";
 
 export default function ProfilePage() {
   const { token, user, openLogin, setAuth } = useLoginModal();
   const [syncing, setSyncing] = useState(false);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
     setSyncing(true);
+    setLoadError("");
     getProfile(token)
       .then((fresh) => {
         if (!cancelled) setAuth(token, fresh);
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Could not load profile");
+      })
       .finally(() => {
         if (!cancelled) setSyncing(false);
       });
@@ -60,7 +55,10 @@ export default function ProfilePage() {
               <div className="text-center">
                 <p className="text-xs uppercase tracking-[0.25em] text-amber-800/70 mb-2">Account</p>
                 <h1 className="font-display text-3xl md:text-4xl font-light text-charcoal">Profile</h1>
-                {syncing && <p className="text-xs text-gray-500 mt-2">Updating…</p>}
+                {syncing && <p className="text-xs text-gray-500 mt-2">Loading from server…</p>}
+                {loadError && !syncing && (
+                  <p className="text-xs text-red-600 mt-2">{loadError}</p>
+                )}
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden divide-y divide-gray-100">
@@ -70,7 +68,7 @@ export default function ProfilePage() {
                 </div>
                 <div className="p-5 md:p-6">
                   <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-1">Mobile</p>
-                  <p className="text-lg text-charcoal">
+                  <p className="text-lg text-charcoal tabular-nums">
                     {user?.mobile ? `${user.countryCode || ""} ${user.mobile}` : "—"}
                   </p>
                 </div>
@@ -84,7 +82,9 @@ export default function ProfilePage() {
                 >
                   <div>
                     <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-1">Wallet</p>
-                    <p className="text-lg font-semibold text-amber-800 tabular-nums">{formatWalletAud(user?.wallet)}</p>
+                    <p className="text-lg font-semibold text-amber-800 tabular-nums">
+                      {formatAud(user?.wallet ?? 0) ?? "$0"}
+                    </p>
                   </div>
                   <span className="text-sm font-medium text-amber-800 shrink-0">View wallet →</span>
                 </Link>
@@ -92,10 +92,10 @@ export default function ProfilePage() {
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
                 <Link
-                  href="/appointment"
+                  href="/appointments"
                   className="inline-flex justify-center items-center rounded-full bg-charcoal px-6 py-2.5 text-sm font-semibold text-white hover:bg-charcoal/90 transition-colors"
                 >
-                  Book appointment
+                  My appointments
                 </Link>
                 <Link
                   href="/services"

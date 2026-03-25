@@ -6,6 +6,7 @@ import ScrollReveal from "./ScrollReveal";
 import LazyImage from "./LazyImage";
 import { getServices } from "@/services/api";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { formatAud } from "@/lib/formatCurrency";
 
 const FALLBACK_IMAGES: Record<string, string> = {
   "Hair Cutting": "/images/services/hair-cutting.svg",
@@ -23,7 +24,9 @@ type ServicesProps = {
 
 export default function Services({ limit }: ServicesProps) {
   const { handleBookNow } = useLoginModal();
-  const [services, setServices] = useState<{ title: string; description: string; image: string; tag?: string | null }[]>([]);
+  const [services, setServices] = useState<
+    { title: string; description: string; image: string; tag?: string | null; price?: number | string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -97,9 +100,14 @@ export default function Services({ limit }: ServicesProps) {
                 </div>
 
                 <div className="flex flex-1 min-h-0 flex-col gap-4 p-8">
-                  <h3 className="font-display text-2xl font-medium text-charcoal shrink-0 group-hover:text-amber-800 transition-colors">
-                    {service.title}
-                  </h3>
+                  <div className="shrink-0 flex flex-wrap items-baseline justify-between gap-2 gap-y-1">
+                    <h3 className="font-display text-2xl font-medium text-charcoal group-hover:text-amber-800 transition-colors">
+                      {service.title}
+                    </h3>
+                    {formatAud(service.price) ? (
+                      <span className="text-base font-semibold text-[#8B6914] tabular-nums">{formatAud(service.price)}</span>
+                    ) : null}
+                  </div>
                   <p className="min-h-0 flex-1 text-gray-600 leading-relaxed text-[15px] md:text-base">
                     {service.description}
                   </p>

@@ -6,12 +6,15 @@ import Footer from "@/components/Footer";
 import LazyImage from "@/components/LazyImage";
 import { getCategories } from "@/services/api";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { formatAud } from "@/lib/formatCurrency";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&q=85";
 
 export default function ServicesPage() {
   const { handleBookNow } = useLoginModal();
-  const [services, setServices] = useState<{ name: string; description: string; items: string[]; image: string; alt: string }[]>([]);
+  const [services, setServices] = useState<
+    { name: string; description: string; items: string[]; image: string; alt: string; price?: number | string }[]
+  >([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -57,10 +60,17 @@ export default function ServicesPage() {
                     }}
                   />
                 </div>
-                <div className="p-10 md:p-16 flex-1">
-                  <h2 className="font-display text-2xl md:text-3xl font-light text-charcoal mb-4">
-                    {service.name}
-                  </h2>
+                <div className="p-10 md:p-16 flex-1 flex flex-col">
+                  <div className="flex flex-wrap items-baseline justify-between gap-3 mb-4">
+                    <h2 className="font-display text-2xl md:text-3xl font-light text-charcoal">
+                      {service.name}
+                    </h2>
+                    {formatAud(service.price) ? (
+                      <p className="text-lg md:text-xl font-semibold text-[#8B6914] tabular-nums shrink-0">
+                        {formatAud(service.price)}
+                      </p>
+                    ) : null}
+                  </div>
                   <p className="text-gray-600 mb-8 max-w-2xl">{service.description}</p>
                   <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {(service.items || []).map((item, i) => (
@@ -70,7 +80,7 @@ export default function ServicesPage() {
                       </li>
                     ))}
                   </ul>
-                  <div className="mt-8 flex w-full justify-end border-t border-gray-100 pt-6">
+                  <div className="mt-auto flex w-full justify-end border-t border-gray-100 pt-6">
                     <button
                       type="button"
                       onClick={() => handleBookNow(service.name)}

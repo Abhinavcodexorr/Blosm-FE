@@ -122,6 +122,41 @@ export async function bookAppointment(body: BookAppointmentBody, token?: string 
   return data;
 }
 
+/** One row from GET /appointments/my — matches typical backend payload. */
+export type MyAppointment = {
+  _id?: string;
+  userId?: string;
+  name?: string;
+  email?: string;
+  mobile?: string;
+  countryCode?: string;
+  service?: string;
+  serviceId?: string;
+  duration?: number;
+  date?: string;
+  time?: string;
+  status?: string;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+  price?: number | string;
+};
+
+/**
+ * Normalizes API envelopes, e.g.
+ * `{ success: true, data: [...] }` or `{ appointments: [...] }` or a bare array.
+ */
+export function parseMyBookingsList(json: unknown): MyAppointment[] {
+  if (json == null) return [];
+  if (Array.isArray(json)) return json as MyAppointment[];
+  if (typeof json !== "object") return [];
+  const o = json as Record<string, unknown>;
+  const inner = o.data ?? o.appointments ?? o.results;
+  if (Array.isArray(inner)) return inner as MyAppointment[];
+  return [];
+}
+
+/** Raw JSON from GET /appointments/my (legacy). */
 export async function getMyBookings(token: string) {
   const res = await fetch(`${API_BASE_URL}/api/v1/appointments/my`, {
     headers: { Authorization: `Bearer ${token}` },
@@ -129,5 +164,15 @@ export async function getMyBookings(token: string) {
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || data.message || "Failed to fetch bookings");
+  if (data && typeof data === "object" && data.success === false) {
+    throw new Error(
+      typeof data.message === "string" ? data.message : "Failed to fetch bookings"
+    );
+  }
   return data;
+}
+
+export async function getMyBookingsList(token: string): Promise<MyAppointment[]> {
+  const json = await getMyBookings(token);
+  return parseMyBookingsList(json);
 }

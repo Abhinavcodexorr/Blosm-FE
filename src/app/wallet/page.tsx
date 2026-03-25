@@ -6,16 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile } from "@/lib/api";
-
-function formatWalletAud(value: number) {
-  const n = Number.isFinite(value) ? value : 0;
-  return new Intl.NumberFormat("en-AU", {
-    style: "currency",
-    currency: "AUD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(n);
-}
+import { formatAud } from "@/lib/formatCurrency";
 
 export default function WalletPage() {
   const { token, user, openLogin, setAuth } = useLoginModal();
@@ -27,12 +18,9 @@ export default function WalletPage() {
     setProfileRefreshing(true);
     getProfile(token)
       .then((fresh) => {
-        if (cancelled) return;
-        setAuth(token, fresh);
+        if (!cancelled) setAuth(token, fresh);
       })
-      .catch(() => {
-        /* keep existing session user if /me fails */
-      })
+      .catch(() => {})
       .finally(() => {
         if (!cancelled) setProfileRefreshing(false);
       });
@@ -40,6 +28,8 @@ export default function WalletPage() {
       cancelled = true;
     };
   }, [token, setAuth]);
+
+  const balanceLabel = formatAud(user?.wallet ?? 0) ?? "$0";
 
   return (
     <main className="min-h-screen">
@@ -60,9 +50,7 @@ export default function WalletPage() {
                 </svg>
               </div>
               <h1 className="font-display text-3xl font-light text-charcoal mb-3">Your wallet</h1>
-              <p className="text-gray-600 mb-8 leading-relaxed">
-                Sign in to view your Blosm balance and rewards.
-              </p>
+              <p className="text-gray-600 mb-8 leading-relaxed">Sign in to view your Blosm balance and rewards.</p>
               <button
                 type="button"
                 onClick={openLogin}
@@ -77,7 +65,7 @@ export default function WalletPage() {
                 <p className="text-xs uppercase tracking-[0.25em] text-amber-800/70 mb-2">Wallet</p>
                 <h1 className="font-display text-3xl md:text-4xl font-light text-charcoal">Blosm balance</h1>
                 <p className="text-gray-600 mt-2 text-sm md:text-base">
-                  Use on future visits — credits may apply to services when available.
+                  Use on future visits when your stylist confirms eligibility.
                 </p>
               </div>
 
@@ -87,7 +75,7 @@ export default function WalletPage() {
                   <p
                     className={`font-display text-4xl md:text-5xl font-light tracking-tight transition-opacity ${profileRefreshing ? "opacity-70" : ""}`}
                   >
-                    {formatWalletAud(user?.wallet ?? 0)}
+                    {balanceLabel}
                   </p>
                   {profileRefreshing && (
                     <p className="text-xs text-amber-100/80 mt-2">Syncing with your account…</p>
@@ -95,7 +83,7 @@ export default function WalletPage() {
                 </div>
                 <div className="px-6 py-6 space-y-4">
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Loyalty rewards and top-ups will appear here. Need to book? Your wallet can be used when your stylist confirms eligibility at checkout.
+                    Loyalty rewards and top-ups will appear here after they are added to your account.
                   </p>
                   <div className="flex flex-col sm:flex-row gap-3 pt-2">
                     <Link
@@ -105,10 +93,10 @@ export default function WalletPage() {
                       Browse services
                     </Link>
                     <Link
-                      href="/appointment"
+                      href="/appointments"
                       className="inline-flex justify-center items-center rounded-full border-2 border-amber-200 px-6 py-2.5 text-sm font-semibold text-amber-900 hover:bg-amber-50 transition-colors"
                     >
-                      Book appointment
+                      My appointments
                     </Link>
                   </div>
                 </div>

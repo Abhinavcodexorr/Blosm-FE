@@ -5,22 +5,12 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import BlosmLogo from './BlosmLogo'
 import { useLoginModal } from '@/context/LoginModalContext'
-import { getMyBookings } from '@/lib/api'
 
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/services', label: 'Services' },
   { href: '/contact', label: 'Contact' },
 ]
-
-type Appointment = {
-  _id?: string;
-  service?: string;
-  date?: string;
-  time?: string;
-  status?: string;
-  [key: string]: unknown;
-};
 
 /** Outline user mark: round head + shoulders, balanced for ~22–24px display */
 function ProfileOutlineIcon({ className = 'h-6 w-6 shrink-0' }: { className?: string }) {
@@ -44,8 +34,6 @@ function ProfileOutlineIcon({ className = 'h-6 w-6 shrink-0' }: { className?: st
 export default function Header() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
-  const [appointments, setAppointments] = useState<Appointment[]>([])
-  const [appointmentsLoading, setAppointmentsLoading] = useState(false)
   const profileRef = useRef<HTMLLIElement>(null)
   const [scrolled, setScrolled] = useState(false)
   const pathname = usePathname()
@@ -61,22 +49,6 @@ export default function Header() {
   }, [])
 
   useEffect(() => {
-    if ((profileOpen || mobileMenuOpen) && token) {
-      setAppointmentsLoading(true)
-      getMyBookings(token)
-        .then((res: { data?: unknown; appointments?: Appointment[] }) => {
-          const raw = res?.data ?? res
-          const list = Array.isArray(raw)
-            ? raw
-            : (raw as { appointments?: Appointment[] })?.appointments ?? res?.appointments ?? []
-          setAppointments(list)
-        })
-        .catch(() => setAppointments([]))
-        .finally(() => setAppointmentsLoading(false))
-    }
-  }, [profileOpen, mobileMenuOpen, token])
-
-  useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
         setProfileOpen(false)
@@ -90,15 +62,7 @@ export default function Header() {
   const isOverHero = isHomeAtTop
   const headerBg = isOverHero ? 'bg-transparent' : 'bg-white/95 backdrop-blur-sm'
   const borderClass = isOverHero ? 'border-transparent' : 'border-rose-200/50'
-  const textClass = isOverHero ? 'text-white' : 'text-charcoal-800'
   const linkClass = isOverHero ? 'text-white/90 hover:text-amber-200' : 'text-charcoal-600 hover:text-amber-800'
-
-  const formatDate = (d?: string) => {
-    if (!d) return ''
-    const date = new Date(d)
-    if (Number.isNaN(date.getTime())) return d
-    return date.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' })
-  }
 
   const formatWalletAud = (value: number | undefined) => {
     const n = typeof value === 'number' && Number.isFinite(value) ? value : 0
@@ -195,44 +159,16 @@ export default function Header() {
                   </svg>
                 </Link>
 
-                <div className="max-h-52 overflow-y-auto border-b border-gray-100">
-                  <div className="px-4 pt-3 pb-1 text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em]">
-                    Appointments
-                  </div>
-                  {appointmentsLoading ? (
-                    <p className="px-4 py-5 text-sm text-gray-500 text-center">Loading…</p>
-                  ) : appointments.length === 0 ? (
-                    <p className="px-4 py-5 text-sm text-gray-500 text-center">No appointments yet</p>
-                  ) : (
-                    <ul className="pb-2">
-                      {appointments.map((apt) => (
-                        <li
-                          key={apt._id || String(apt.date) + String(apt.time)}
-                          className="px-4 py-2.5 hover:bg-amber-50/50 border-t border-gray-50 first:border-t-0"
-                        >
-                          <p className="text-sm font-medium text-charcoal">{apt.service || 'Appointment'}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatDate(apt.date)}
-                            {apt.time ? ` at ${apt.time}` : ''}
-                          </p>
-                          {apt.status && (
-                            <span
-                              className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${
-                                apt.status === 'confirmed'
-                                  ? 'bg-green-100 text-green-800'
-                                  : apt.status === 'completed'
-                                    ? 'bg-gray-100 text-gray-600'
-                                    : 'bg-amber-100 text-amber-800'
-                              }`}
-                            >
-                              {apt.status}
-                            </span>
-                          )}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
+                <Link
+                  href="/appointments"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center justify-between gap-3 px-4 py-3.5 hover:bg-amber-50/60 transition-colors border-b border-gray-100"
+                >
+                  <span className="text-sm font-semibold text-charcoal">Appointments</span>
+                  <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
 
                 <Link
                   href="/wallet"
@@ -294,7 +230,7 @@ export default function Header() {
                 <li className="pt-2 border-t border-gray-100">
                   <Link
                     href="/profile"
-                    className="flex items-center justify-between gap-2 text-sm font-semibold text-charcoal-600 hover:text-amber-800 py-1 mb-3"
+                    className="flex items-center justify-between gap-2 text-sm font-semibold text-charcoal-600 hover:text-amber-800 py-2"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Profile
@@ -302,28 +238,17 @@ export default function Header() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>
-                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-2">Appointments</p>
-                  {appointmentsLoading ? (
-                    <p className="text-sm text-gray-500 mb-4">Loading…</p>
-                  ) : appointments.length === 0 ? (
-                    <p className="text-sm text-gray-500 mb-4">No appointments yet</p>
-                  ) : (
-                    <ul className="space-y-2 mb-4">
-                      {appointments.slice(0, 5).map((apt) => (
-                        <li key={apt._id || String(apt.date) + String(apt.time)} className="text-sm text-charcoal-600">
-                          <span className="font-medium">{apt.service || 'Appointment'}</span>
-                          <span className="text-gray-500 ml-1">
-                            {formatDate(apt.date)}
-                            {apt.time ? ` at ${apt.time}` : ''}
-                          </span>
-                        </li>
-                      ))}
-                      {appointments.length > 5 && (
-                        <p className="text-xs text-gray-500">+{appointments.length - 5} more</p>
-                      )}
-                    </ul>
-                  )}
-                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-2">Wallet</p>
+                  <Link
+                    href="/appointments"
+                    className="flex items-center justify-between gap-2 text-sm font-semibold text-charcoal-600 hover:text-amber-800 py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Appointments
+                    <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                  <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.2em] mb-2 mt-2">Wallet</p>
                   <Link
                     href="/wallet"
                     className="flex items-center justify-between gap-2 py-2 px-3 -mx-1 rounded-lg bg-amber-50/80 border border-amber-100/80 text-amber-900 hover:bg-amber-100/80 transition-colors mb-2"
