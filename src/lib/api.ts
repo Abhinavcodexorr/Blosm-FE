@@ -119,6 +119,9 @@ export async function bookAppointment(body: BookAppointmentBody, token?: string 
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || data.message || "Failed to book appointment");
+  if (data && typeof data === "object" && data.success === false) {
+    throw new Error(data.message || data.error?.message || "Failed to book appointment");
+  }
   return data;
 }
 
