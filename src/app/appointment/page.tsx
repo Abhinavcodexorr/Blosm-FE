@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PhoneCountryField from "@/components/PhoneCountryField";
+import BookingDateField from "@/components/BookingDateField";
 import { getServicesForBooking } from "@/services/api";
-import { bookAppointment } from "@/lib/api";
+import { bookAppointment, getSalonAvailability, type SalonAvailability } from "@/lib/api";
+import {
+  halfHourSlotsInWindow,
+  isSlotTimePassedForSelectedDate,
+  localDateYmd,
+} from "@/lib/availabilitySlots";
 import { useLoginModal } from "@/context/LoginModalContext";
 import {
   sanitizeMobileDigits,
@@ -27,7 +33,13 @@ export default function AppointmentBookingPage() {
   const [notes, setNotes] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [services, setServices] = useState<ServiceOption[]>([]);
+  const [availability, setAvailability] = useState<SalonAvailability | null>(null);
+  const [availabilityLoading, setAvailabilityLoading] = useState(true);
+  const [availabilityError, setAvailabilityError] = useState("");
+  /** Bumps every second on the client so past-slot disabled state stays in sync with the clock. */
+  const [clockTick, setClockTick] = useState(0);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -35,10 +47,25 @@ export default function AppointmentBookingPage() {
   const [serviceTitle, setServiceTitle] = useState("");
 
   useEffect(() => {
+    setClockTick((n) => n + 1);
+    const id = window.setInterval(() => setClockTick((n) => n + 1), 1000);
+    return () => window.clearInterval(id);
+  }, []);
+
+  useEffect(() => {
     getServicesForBooking()
       .then(setServices)
       .catch(() => setServices([]))
       .finally(() => setLoading(false));
+  }, []);
+
+  useEffect(() => {
+    setAvailabilityLoading(true);
+    setAvailabilityError("");
+    getSalonAvailability()
+      .then(setAvailability)
+      .catch((e) => setAvailabilityError(e instanceof Error ? e.message : "Could not load opening hours"))
+      .finally(() => setAvailabilityLoading(false));
   }, []);
 
   useEffect(() => {
@@ -52,12 +79,41 @@ export default function AppointmentBookingPage() {
     }
   }, [services]);
 
+  /** 1) API gives `availableFrom` / `availableTo` → 2) half-hour starts only inside that range. */
+  const baseSlots = useMemo(() => {
+    if (!availability?.availableFrom?.trim() || !availability?.availableTo?.trim()) return [];
+    return halfHourSlotsInWindow(availability.availableFrom, availability.availableTo);
+  }, [availability]);
+
+  const maxBookAheadYmd = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 4);
+    return localDateYmd(d);
+  }, []);
+
+  useEffect(() => {
+    if (!time || !date) return;
+    void clockTick;
+    const now = new Date();
+    if (!baseSlots.includes(time) || isSlotTimePassedForSelectedDate(date, time, now)) {
+      setTime("");
+    }
+  }, [date, time, baseSlots, clockTick]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     const digits = sanitizeMobileDigits(mobile);
     if (!isValidMobileDigits(digits)) {
       setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number.`);
+      return;
+    }
+    if (!date) {
+      setError("Please choose an appointment date.");
+      return;
+    }
+    if (!time) {
+      setError("Please choose a time slot.");
       return;
     }
     const countryCode = dialFromSelection(countrySelect);
@@ -72,7 +128,7 @@ export default function AppointmentBookingPage() {
           email,
           serviceId,
           date,
-          time: "",
+          time,
           notes: notes || undefined,
         },
         token
@@ -102,7 +158,8 @@ export default function AppointmentBookingPage() {
               <p className="text-gray-600 mb-8">
                 Thank you, {name}. We&apos;ll contact you shortly at {dialFromSelection(countrySelect)} {mobile} to
                 confirm your {serviceTitle || "appointment"}
-                {date ? ` on ${date}` : ""}.
+                {date ? ` on ${date}` : ""}
+                {time ? ` at ${time}` : ""}.
               </p>
               <Link
                 href="/appointments"
@@ -156,6 +213,9 @@ export default function AppointmentBookingPage() {
               onMobileChange={setMobile}
               onCountryChange={setCountrySelect}
               rounded="lg"
+              placeholder="e.g. 412 345 678"
+              helperText="We'll text you about your booking. Enter 8–11 digits after the country code."
+              showDigitMeter
             />
 
             <div>
@@ -196,19 +256,79 @@ export default function AppointmentBookingPage() {
               </select>
             </div>
 
+            <BookingDateField
+              id="appt-date"
+              label="Appointment date"
+              min={localDateYmd(new Date())}
+              max={maxBookAheadYmd}
+              value={date}
+              onChange={(v) => {
+                setDate(v);
+                setTime("");
+              }}
+            />
+
             <div>
-              <label htmlFor="appt-date" className="block text-sm font-medium text-charcoal mb-2">
-                Appointment date
-              </label>
-              <input
-                id="appt-date"
-                type="date"
-                required
-                min={new Date().toISOString().split("T")[0]}
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors"
-              />
+              <span className="block text-sm font-medium text-charcoal mb-2">Preferred time</span>
+              {!date ? (
+                <p className="text-sm text-gray-500">Choose a date first.</p>
+              ) : availabilityLoading ? (
+                <p className="text-sm text-gray-500">Loading available hours…</p>
+              ) : availabilityError ? (
+                <p className="text-sm text-amber-800 bg-amber-50 px-4 py-3 rounded-lg">{availabilityError}</p>
+              ) : baseSlots.length === 0 ? (
+                <p className="text-sm text-gray-600">No slots in the configured range. Please contact us.</p>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-500 mb-3">
+                    {availability
+                      ? `Within ${availability.availableFrom}–${availability.availableTo} · 30 min slots`
+                      : null}
+                    {date === localDateYmd(new Date()) ? (
+                      <span className="block mt-1 text-gray-400">
+                        Times that have already passed today are shown but cannot be selected.
+                      </span>
+                    ) : null}
+                  </p>
+                  <div
+                    className="grid grid-cols-3 sm:grid-cols-4 gap-2"
+                    role="listbox"
+                    aria-label="Time slots"
+                  >
+                    {baseSlots.map((slot) => {
+                      void clockTick;
+                      const now = new Date();
+                      const passed = date
+                        ? isSlotTimePassedForSelectedDate(date, slot, now)
+                        : false;
+                      const selected = time === slot && !passed;
+                      return (
+                        <button
+                          key={slot}
+                          type="button"
+                          role="option"
+                          aria-selected={selected}
+                          disabled={passed}
+                          aria-disabled={passed}
+                          title={passed ? "This time has already passed" : undefined}
+                          onClick={() => {
+                            if (!passed) setTime(slot);
+                          }}
+                          className={`rounded-lg border px-3 py-2.5 text-sm font-medium transition-colors ${
+                            passed
+                              ? "border-gray-200 bg-gray-100 text-gray-400 cursor-not-allowed opacity-60 pointer-events-none"
+                              : selected
+                                ? "border-amber-500 bg-amber-50 text-amber-900"
+                                : "border-gray-200 bg-white text-charcoal hover:border-amber-300 hover:bg-amber-50/50"
+                          }`}
+                        >
+                          {slot}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
             </div>
 
             <div>

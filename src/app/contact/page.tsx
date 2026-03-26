@@ -10,7 +10,8 @@ import {
   MOBILE_DIGITS_MIN,
   MOBILE_DIGITS_LEN,
 } from "@/lib/mobileInput";
-import { getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
+import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
+import { submitEnquiry } from "@/lib/api";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -20,15 +21,36 @@ export default function ContactPage() {
   const [message, setMessage] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError("");
-    if (!isValidMobileDigits(sanitizeMobileDigits(mobile))) {
+    const digits = sanitizeMobileDigits(mobile);
+    if (!isValidMobileDigits(digits)) {
       setFormError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number.`);
       return;
     }
-    setSubmitted(true);
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage) {
+      setFormError("Please enter a message.");
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await submitEnquiry({
+        name: name.trim(),
+        email: email.trim(),
+        mobile: digits,
+        countryCode: dialFromSelection(countrySelect),
+        message: trimmedMessage,
+      });
+      setSubmitted(true);
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to send message");
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (submitted) {
@@ -167,9 +189,10 @@ export default function ContactPage() {
                 </div>
                 <button
                   type="submit"
-                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-lg transition-colors"
+                  disabled={submitting}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-lg transition-colors"
                 >
-                  Send Message
+                  {submitting ? "Sending…" : "Send Message"}
                 </button>
               </form>
             </div>

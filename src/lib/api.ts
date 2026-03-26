@@ -91,6 +91,28 @@ export type BookAppointmentBody = {
   notes?: string;
 };
 
+export type SalonAvailability = {
+  availableFrom: string;
+  availableTo: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export async function getSalonAvailability(): Promise<SalonAvailability> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/availability`, {
+    credentials: "include",
+  });
+  const json = await res.json();
+  if (!res.ok || json.success === false) {
+    throw new Error(json.message || json.error?.message || "Failed to fetch availability");
+  }
+  const data = json.data as SalonAvailability | undefined;
+  if (!data?.availableFrom || !data?.availableTo) {
+    throw new Error("Invalid availability response");
+  }
+  return data;
+}
+
 export type AvailableSlotsResponse = {
   slots: string[];
   duration: number;
@@ -107,6 +129,40 @@ export async function getAvailableSlots(date: string, serviceId: string): Promis
     throw new Error(json.message || json.error?.message || "Failed to fetch available slots");
   }
   return json.data || { slots: [], duration: 30, serviceTitle: "" };
+}
+
+/** Public contact / enquiry — no auth. `mobile` must be digits only. */
+export type EnquiryBody = {
+  name: string;
+  email: string;
+  mobile: string;
+  countryCode: string;
+  message: string;
+};
+
+export async function submitEnquiry(body: EnquiryBody) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/enquiries`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof data.error === "string"
+        ? data.error
+        : typeof data.message === "string"
+          ? data.message
+          : "Failed to send message"
+    );
+  }
+  if (data && typeof data === "object" && data.success === false) {
+    throw new Error(
+      typeof data.message === "string" ? data.message : "Failed to send message"
+    );
+  }
+  return data;
 }
 
 export async function bookAppointment(body: BookAppointmentBody, token?: string | null) {

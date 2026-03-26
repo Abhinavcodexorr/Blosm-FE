@@ -8,8 +8,6 @@ export type ApiService = {
   alt?: string;
   items?: string[];
   isActive?: boolean;
-  /** Service price from API (AUD). */
-  price?: number | string;
 };
 
 type ServicesApiResponse = {
@@ -29,14 +27,7 @@ async function fetchServices(): Promise<ApiService[]> {
 }
 
 export async function getServices(): Promise<
-  {
-    title: string;
-    description: string;
-    image: string;
-    tag?: string | null;
-    items?: string[];
-    price?: number | string;
-  }[]
+  { title: string; description: string; image: string; tag?: string | null; items?: string[] }[]
 > {
   const data = await fetchServices();
   return data
@@ -47,20 +38,11 @@ export async function getServices(): Promise<
       image: s.image || "",
       tag: null as string | null,
       items: s.items || [],
-      price: s.price,
     }));
 }
 
 export async function getCategories(): Promise<
-  {
-    _id: string;
-    name: string;
-    description: string;
-    image: string;
-    alt: string;
-    items: string[];
-    price?: number | string;
-  }[]
+  { _id: string; name: string; description: string; image: string; alt: string; items: string[] }[]
 > {
   const data = await fetchServices();
   return data
@@ -72,7 +54,6 @@ export async function getCategories(): Promise<
       image: s.image || "",
       alt: s.alt || s.title,
       items: s.items || [],
-      price: s.price,
     }));
 }
 
