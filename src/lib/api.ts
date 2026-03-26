@@ -86,7 +86,8 @@ export type BookAppointmentBody = {
   countryCode?: string;
   serviceId: string;
   date: string; // YYYY-MM-DD
-  time: string; // HH:mm, must be from available slots
+  /** Optional; salon may confirm time later. */
+  time?: string;
   notes?: string;
 };
 

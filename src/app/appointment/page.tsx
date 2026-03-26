@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PhoneCountryField from "@/components/PhoneCountryField";
 import { getServicesForBooking } from "@/services/api";
-import { bookAppointment, getAvailableSlots } from "@/lib/api";
+import { bookAppointment } from "@/lib/api";
 import { useLoginModal } from "@/context/LoginModalContext";
 import {
   sanitizeMobileDigits,
@@ -27,10 +27,7 @@ export default function AppointmentBookingPage() {
   const [notes, setNotes] = useState("");
   const [serviceId, setServiceId] = useState("");
   const [date, setDate] = useState("");
-  const [time, setTime] = useState("");
   const [services, setServices] = useState<ServiceOption[]>([]);
-  const [slots, setSlots] = useState<string[]>([]);
-  const [slotsLoading, setSlotsLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -55,28 +52,6 @@ export default function AppointmentBookingPage() {
     }
   }, [services]);
 
-  const fetchSlots = useCallback(async () => {
-    if (!serviceId || !date) {
-      setSlots([]);
-      setTime("");
-      return;
-    }
-    setSlotsLoading(true);
-    setTime("");
-    try {
-      const data = await getAvailableSlots(date, serviceId);
-      setSlots(data.slots || []);
-    } catch {
-      setSlots([]);
-    } finally {
-      setSlotsLoading(false);
-    }
-  }, [serviceId, date]);
-
-  useEffect(() => {
-    fetchSlots();
-  }, [fetchSlots]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -97,7 +72,7 @@ export default function AppointmentBookingPage() {
           email,
           serviceId,
           date,
-          time,
+          time: "",
           notes: notes || undefined,
         },
         token
@@ -127,7 +102,7 @@ export default function AppointmentBookingPage() {
               <p className="text-gray-600 mb-8">
                 Thank you, {name}. We&apos;ll contact you shortly at {dialFromSelection(countrySelect)} {mobile} to
                 confirm your {serviceTitle || "appointment"}
-                {date ? ` on ${date}${time ? ` at ${time}` : ""}` : ""}.
+                {date ? ` on ${date}` : ""}.
               </p>
               <Link
                 href="/appointments"
@@ -237,35 +212,6 @@ export default function AppointmentBookingPage() {
             </div>
 
             <div>
-              <label htmlFor="appt-time" className="block text-sm font-medium text-charcoal mb-2">
-                Appointment time
-              </label>
-              <select
-                id="appt-time"
-                required
-                value={time}
-                onChange={(e) => setTime(e.target.value)}
-                disabled={slotsLoading || !serviceId || !date}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white disabled:opacity-60"
-              >
-                <option value="">
-                  {slotsLoading
-                    ? "Loading slots…"
-                    : !serviceId || !date
-                      ? "Select service and date first"
-                      : slots.length === 0
-                        ? "No slots available"
-                        : "Select a time slot"}
-                </option>
-                {slots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
               <label htmlFor="appt-notes" className="block text-sm font-medium text-charcoal mb-2">
                 Notes (optional)
               </label>
@@ -281,7 +227,7 @@ export default function AppointmentBookingPage() {
 
             <button
               type="submit"
-              disabled={submitting || !time}
+              disabled={submitting}
               className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-lg transition-colors"
             >
               {submitting ? "Booking…" : "Request appointment"}
