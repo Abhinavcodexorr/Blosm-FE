@@ -12,17 +12,51 @@ export async function sendOtp(mobile: string, countryCode: string) {
   return data;
 }
 
-export async function verifyOtp(mobile: string, countryCode: string, otp: string) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mobile, countryCode, otp }),
-    credentials: "include",
-  });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message || json.error?.message || "Invalid OTP");
-  const { token, user } = json.data || {};
-  return { token, user };
+/** Single wallet ledger row from `GET /users/me` and verify-otp user payload. */
+export type WalletHistoryEntry = {
+  _id: string;
+  type: string;
+  amount: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  note: string | null;
+  appointmentId: string | null;
+  /** Set when the entry is linked to a booking. */
+  appointmentName: string | null;
+  appointmentDate: string | null;
+  appointmentTime: string | null;
+  createdAt: string;
+};
+
+function strOrNull(v: unknown): string | null {
+  if (v == null || v === "") return null;
+  return String(v);
+}
+
+function parseWalletHistoryEntry(raw: unknown): WalletHistoryEntry | null {
+  if (!raw || typeof raw !== "object") return null;
+  const e = raw as Record<string, unknown>;
+  const num = (v: unknown) =>
+    typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v !== "" ? Number(v) || 0 : 0;
+  return {
+    _id: String(e._id ?? ""),
+    type: String(e.type ?? "unknown"),
+    amount: num(e.amount),
+    balanceBefore: num(e.balanceBefore),
+    balanceAfter: num(e.balanceAfter),
+    note: e.note == null || e.note === "" ? null : String(e.note),
+    appointmentId:
+      e.appointmentId == null || e.appointmentId === "" ? null : String(e.appointmentId),
+    appointmentName: strOrNull(e.appointmentName),
+    appointmentDate: strOrNull(e.appointmentDate),
+    appointmentTime: strOrNull(e.appointmentTime),
+    createdAt: e.createdAt != null ? String(e.createdAt) : "",
+  };
+}
+
+function parseWalletHistory(raw: unknown): WalletHistoryEntry[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  return raw.map(parseWalletHistoryEntry).filter((x): x is WalletHistoryEntry => x != null);
 }
 
 /** Matches backend `toPublicUser` (verify-otp + GET /users/me). */
@@ -33,6 +67,7 @@ export type PublicUser = {
   name: string | null;
   email: string | null;
   wallet: number;
+  walletHistory?: WalletHistoryEntry[];
 };
 
 function parsePublicUser(raw: unknown): PublicUser {
@@ -47,6 +82,7 @@ function parsePublicUser(raw: unknown): PublicUser {
       : typeof walletRaw === "string" && walletRaw !== ""
         ? Number(walletRaw) || 0
         : 0;
+  const wh = parseWalletHistory(o.walletHistory);
   return {
     _id: String(o._id ?? ""),
     mobile: String(o.mobile ?? ""),
@@ -54,7 +90,24 @@ function parsePublicUser(raw: unknown): PublicUser {
     name: o.name == null || o.name === "" ? null : String(o.name),
     email: o.email == null || o.email === "" ? null : String(o.email),
     wallet,
+    ...(wh ? { walletHistory: wh } : {}),
   };
+}
+
+export async function verifyOtp(mobile: string, countryCode: string, otp: string) {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mobile, countryCode, otp }),
+    credentials: "include",
+  });
+  const json = await res.json();
+  if (!res.ok || !json.success) throw new Error(json.message || json.error?.message || "Invalid OTP");
+  const { token, user: rawUser } = json.data || {};
+  if (!token || rawUser == null || typeof rawUser !== "object") {
+    throw new Error("Invalid response");
+  }
+  return { token, user: parsePublicUser(rawUser) };
 }
 
 export async function getProfile(token: string): Promise<PublicUser> {

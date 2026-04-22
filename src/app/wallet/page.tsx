@@ -1,16 +1,40 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useMemo, useEffect, useState } from "react";
 import Link from "next/link";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
-import { getProfile } from "@/lib/api";
+import { getProfile, type WalletHistoryEntry } from "@/lib/api";
 import { formatAud } from "@/lib/formatCurrency";
+
+function formatHistoryWhen(iso: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("en-AU", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function isDebitType(type: string) {
+  return type.toLowerCase() === "debit";
+}
 
 export default function WalletPage() {
   const { token, user, openLogin, setAuth } = useLoginModal();
   const [profileRefreshing, setProfileRefreshing] = useState(false);
+
+  const historySorted = useMemo(() => {
+    const rows: WalletHistoryEntry[] = user?.walletHistory ?? [];
+    return [...rows].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }, [user?.walletHistory]);
 
   useEffect(() => {
     if (!token) return;
@@ -35,7 +59,7 @@ export default function WalletPage() {
     <main className="min-h-screen">
       <Header />
       <section className="pt-28 pb-20 md:pt-32 md:pb-24 bg-gradient-to-b from-amber-50/40 via-white to-rose-50/20">
-        <div className="max-w-lg mx-auto px-6">
+        <div className="max-w-2xl mx-auto px-6">
           {!token ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 md:p-10 text-center">
               <div className="mx-auto mb-6 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 text-amber-800">
@@ -100,6 +124,93 @@ export default function WalletPage() {
                     </Link>
                   </div>
                 </div>
+              </div>
+
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/80">
+                  <h2 className="font-display text-lg font-medium text-charcoal">Wallet history</h2>
+                  <p className="text-xs text-gray-500 mt-0.5">Transactions from your account</p>
+                </div>
+                {profileRefreshing && historySorted.length === 0 ? (
+                  <p className="px-5 py-10 text-center text-sm text-gray-500">Loading history…</p>
+                ) : historySorted.length === 0 ? (
+                  <p className="px-5 py-10 text-center text-sm text-gray-500">No wallet activity yet.</p>
+                ) : (
+                  <ul className="divide-y divide-gray-100">
+                    {historySorted.map((entry) => {
+                      const debit = isDebitType(entry.type);
+                      const amountStr = formatAud(entry.amount) ?? "$0";
+                      const bookingTitle =
+                        entry.appointmentName ||
+                        (entry.appointmentId || entry.appointmentDate || entry.appointmentTime
+                          ? "Appointment"
+                          : null);
+                      const dateLine =
+                        entry.appointmentDate || entry.appointmentTime
+                          ? [
+                              entry.appointmentDate
+                                ? new Date(entry.appointmentDate + "T12:00:00").toLocaleDateString("en-AU", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })
+                                : null,
+                              entry.appointmentTime ?? null,
+                            ]
+                              .filter(Boolean)
+                              .join(" · ")
+                          : null;
+                      return (
+                        <li key={entry._id} className="px-5 py-4 hover:bg-amber-50/30 transition-colors">
+                          <div className="flex flex-wrap items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs text-gray-500 tabular-nums">
+                                {formatHistoryWhen(entry.createdAt)}
+                              </p>
+                              {bookingTitle ? (
+                                <div className="mt-1.5">
+                                  <p className="text-sm font-semibold text-charcoal">{bookingTitle}</p>
+                                  {dateLine ? (
+                                    <p className="text-xs text-gray-600 mt-0.5">{dateLine}</p>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                              <p className="text-sm font-medium text-charcoal mt-1 capitalize">
+                                {entry.type}
+                                {entry.appointmentId && !entry.appointmentName ? (
+                                  <span className="font-normal text-gray-500">
+                                    {" "}
+                                    · ref{" "}
+                                    <span className="font-mono text-xs">
+                                      {entry.appointmentId.slice(-6)}
+                                    </span>
+                                  </span>
+                                ) : null}
+                              </p>
+                              {entry.note ? (
+                                <p className="text-xs text-gray-600 mt-1">{entry.note}</p>
+                              ) : null}
+                              <p className="text-xs text-gray-500 mt-1">
+                                Balance: {formatAud(entry.balanceAfter) ?? "—"}{" "}
+                                <span className="text-gray-400">
+                                  (before {formatAud(entry.balanceBefore) ?? "—"})
+                                </span>
+                              </p>
+                            </div>
+                            <div
+                              className={`text-base font-semibold tabular-nums shrink-0 ${
+                                debit ? "text-rose-700" : "text-emerald-700"
+                              }`}
+                            >
+                              {debit ? "−" : "+"}
+                              {formatAud(Math.abs(entry.amount)) ?? amountStr}
+                            </div>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </div>
             </div>
           )}

@@ -2,24 +2,16 @@
 
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
-
-type User = {
-  _id: string;
-  mobile: string;
-  countryCode: string;
-  name: string | null;
-  email: string | null;
-  wallet: number;
-};
+import type { PublicUser } from "@/lib/api";
 
 type LoginModalContextType = {
   isOpen: boolean;
   openLogin: () => void;
   closeLogin: () => void;
-  user: User | null;
+  user: PublicUser | null;
   token: string | null;
   logout: () => void;
-  setAuth: (token: string | null, user: User | null) => void;
+  setAuth: (token: string | null, user: PublicUser | null) => void;
   redirectAfterLogin: string | null;
   setRedirectAfterLogin: (path: string | null) => void;
   handleBookNow: (serviceName?: string) => void;
@@ -32,7 +24,7 @@ const STORAGE_KEY = "blosm_auth";
 export function LoginModalProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<PublicUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [redirectAfterLogin, setRedirectAfterLogin] = useState<string | null>(null);
 
@@ -54,7 +46,7 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
   const openLogin = useCallback(() => setIsOpen(true), []);
   const closeLogin = useCallback(() => setIsOpen(false), []);
 
-  const setAuth = useCallback((t: string | null, u: User | null) => {
+  const setAuth = useCallback((t: string | null, u: PublicUser | null) => {
     setToken(t);
     setUser(u);
     if (typeof window !== "undefined") {
