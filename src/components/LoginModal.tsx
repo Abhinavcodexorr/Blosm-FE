@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { sendOtp, verifyOtp } from "@/lib/api";
 import PhoneCountryField from "@/components/PhoneCountryField";
@@ -12,10 +12,12 @@ import {
   MOBILE_DIGITS_MIN,
   MOBILE_DIGITS_LEN,
 } from "@/lib/mobileInput";
+import { ENQUIRY_THANKS_PENDING_LOGIN_KEY } from "@/lib/enquiryLoginRedirect";
 
 export default function LoginModal() {
   const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
   const router = useRouter();
+  const pathname = usePathname();
   const [mobile, setMobile] = useState("");
   const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [otp, setOtp] = useState("");
@@ -75,6 +77,13 @@ export default function LoginModal() {
     if (redirectAfterLogin) {
       router.push(redirectAfterLogin);
       setRedirectAfterLogin(null);
+    } else if (
+      pathname === "/contact" &&
+      typeof window !== "undefined" &&
+      sessionStorage.getItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY) === "1"
+    ) {
+      sessionStorage.removeItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY);
+      router.push("/");
     }
     handleClose();
   };

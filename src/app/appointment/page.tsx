@@ -5,6 +5,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PhoneCountryField from "@/components/PhoneCountryField";
 import BookingDateField from "@/components/BookingDateField";
+import ServiceSelect from "@/components/ServiceSelect";
 import { getServicesForBooking } from "@/services/api";
 import { bookAppointment, getSalonAvailability, type SalonAvailability } from "@/lib/api";
 import {
@@ -235,26 +236,15 @@ export default function AppointmentBookingPage() {
 
             {error && <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{error}</p>}
 
-            <div>
-              <label htmlFor="appt-service" className="block text-sm font-medium text-charcoal mb-2">
-                Service
-              </label>
-              <select
-                id="appt-service"
-                required
-                value={serviceId}
-                onChange={(e) => setServiceId(e.target.value)}
-                disabled={loading}
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition-colors bg-white disabled:opacity-60"
-              >
-                <option value="">{loading ? "Loading…" : "Select a service"}</option>
-                {services.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.title}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <ServiceSelect
+              id="appt-service"
+              label="Service"
+              value={serviceId}
+              options={services}
+              loading={loading}
+              onChange={setServiceId}
+              required
+            />
 
             <BookingDateField
               id="appt-date"
@@ -280,16 +270,6 @@ export default function AppointmentBookingPage() {
                 <p className="text-sm text-gray-600">No slots in the configured range. Please contact us.</p>
               ) : (
                 <>
-                  <p className="text-xs text-gray-500 mb-3">
-                    {availability
-                      ? `Within ${availability.availableFrom}–${availability.availableTo} · 30 min slots`
-                      : null}
-                    {date === localDateYmd(new Date()) ? (
-                      <span className="block mt-1 text-gray-400">
-                        Times that have already passed today are shown but cannot be selected.
-                      </span>
-                    ) : null}
-                  </p>
                   <div
                     className="grid grid-cols-3 sm:grid-cols-4 gap-2"
                     role="listbox"

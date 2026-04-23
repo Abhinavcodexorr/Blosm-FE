@@ -97,7 +97,7 @@ export default function WalletPage() {
                 <div className="bg-gradient-to-br from-amber-500 to-amber-600 px-6 py-8 text-white relative">
                   <p className="text-sm font-medium text-amber-100/90 mb-1">Available balance</p>
                   <p
-                    className={`font-display text-4xl md:text-5xl font-light tracking-tight transition-opacity ${profileRefreshing ? "opacity-70" : ""}`}
+                    className={`font-sans text-4xl md:text-5xl font-semibold tabular-nums tracking-tight transition-opacity ${profileRefreshing ? "opacity-70" : ""}`}
                   >
                     {balanceLabel}
                   </p>

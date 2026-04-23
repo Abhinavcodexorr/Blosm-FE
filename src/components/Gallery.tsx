@@ -10,7 +10,7 @@ const images = [
   { src: "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?w=800&q=85", alt: "Salon mirror" },
   { src: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=800&q=85", alt: "Nail salon" },
   { src: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=800&q=85", alt: "Salon station" },
-  { src: "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=800&q=85", alt: "Salon interior" },
+  { src: "https://images.unsplash.com/photo-1559599101-f09722fb4948?w=800&q=85", alt: "Woman having hair styled in salon" },
 ];
 
 export default function Gallery() {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PhoneCountryField from "@/components/PhoneCountryField";
@@ -12,6 +12,7 @@ import {
 } from "@/lib/mobileInput";
 import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 import { submitEnquiry } from "@/lib/api";
+import { ENQUIRY_THANKS_PENDING_LOGIN_KEY } from "@/lib/enquiryLoginRedirect";
 
 export default function ContactPage() {
   const [name, setName] = useState("");
@@ -22,6 +23,12 @@ export default function ContactPage() {
   const [submitted, setSubmitted] = useState(false);
   const [formError, setFormError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!submitted && typeof window !== "undefined") {
+      sessionStorage.removeItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY);
+    }
+  }, [submitted]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -45,6 +52,9 @@ export default function ContactPage() {
         countryCode: dialFromSelection(countrySelect),
         message: trimmedMessage,
       });
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY, "1");
+      }
       setSubmitted(true);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to send message");

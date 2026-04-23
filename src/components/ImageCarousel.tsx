@@ -6,7 +6,7 @@ const carouselImages = [
   { src: "https://images.unsplash.com/photo-1633681926022-84c23e8cb2d6?w=600&q=80", alt: "Salon mirror" },
   { src: "https://images.unsplash.com/photo-1521590832167-7bcbfaa6381f?w=600&q=80", alt: "Salon chairs" },
   { src: "https://images.unsplash.com/photo-1516975080664-ed2fc6a32937?w=600&q=80", alt: "Nail salon" },
-  { src: "https://images.unsplash.com/photo-1605497788044-5a32c7078486?w=600&q=80", alt: "Beauty salon" },
+  { src: "https://images.unsplash.com/photo-1559599101-f09722fb4948?w=600&q=80", alt: "Woman having hair styled in salon" },
   { src: "https://images.unsplash.com/photo-1487412947147-5cebf100ffc2?w=600&q=80", alt: "Beauty makeup" },
   { src: "https://images.unsplash.com/photo-1622287162716-f311baa1a2b8?w=600&q=80", alt: "Hair color" },
 ];
