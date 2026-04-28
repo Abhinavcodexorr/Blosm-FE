@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useCallback, useEffect, ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import type { PublicUser } from "@/lib/api";
+import { AUTH_EXPIRED_EVENT } from "@/lib/api";
 
 type LoginModalContextType = {
   isOpen: boolean;
@@ -58,7 +59,23 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const logout = useCallback(() => setAuth(null, null), [setAuth]);
+  const logout = useCallback(() => {
+    setAuth(null, null);
+    setRedirectAfterLogin(null);
+    setIsOpen(true);
+  }, [setAuth]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const onAuthExpired = () => {
+      setAuth(null, null);
+      setRedirectAfterLogin(null);
+      setIsOpen(true);
+      router.push("/");
+    };
+    window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+    return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
+  }, [router, setAuth]);
 
   const handleBookNow = useCallback(
     (serviceName?: string) => {

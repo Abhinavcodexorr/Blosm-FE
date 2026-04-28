@@ -11,6 +11,7 @@ const REFERRAL_REWARD_AMOUNT = 100;
 export default function ReferAndEarnPage() {
   const { token, user, openLogin } = useLoginModal();
   const [copyLabel, setCopyLabel] = useState("Copy code");
+  const [shareLabel, setShareLabel] = useState("Share");
 
   const referralCode = useMemo(() => sanitizeMobileDigits(user?.mobile ?? ""), [user?.mobile]);
 
@@ -23,6 +24,25 @@ export default function ReferAndEarnPage() {
     } catch {
       setCopyLabel("Copy failed");
       window.setTimeout(() => setCopyLabel("Copy code"), 1500);
+    }
+  };
+
+  const handleShare = async () => {
+    if (!referralCode) return;
+    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+      setShareLabel("Share unavailable");
+      window.setTimeout(() => setShareLabel("Share"), 1800);
+      return;
+    }
+    try {
+      await navigator.share({
+        title: "Blosm Refer & Earn",
+        text: `Use my referral code: ${referralCode}`,
+      });
+      setShareLabel("Shared");
+      window.setTimeout(() => setShareLabel("Share"), 1500);
+    } catch {
+      setShareLabel("Share");
     }
   };
 
@@ -59,24 +79,35 @@ export default function ReferAndEarnPage() {
                   <div className="flex-1 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-2xl font-semibold tracking-[0.2em] text-charcoal tabular-nums">
                     {referralCode || "Unavailable"}
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleCopy}
-                    disabled={!referralCode}
-                    className="rounded-xl bg-charcoal text-white px-5 py-3 text-sm font-semibold disabled:opacity-60 hover:bg-charcoal/90 transition-colors"
-                  >
-                    {copyLabel}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      disabled={!referralCode}
+                      className="rounded-xl bg-charcoal text-white px-5 py-3 text-sm font-semibold disabled:opacity-60 hover:bg-charcoal/90 transition-colors"
+                    >
+                      {copyLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleShare}
+                      disabled={!referralCode}
+                      className="rounded-xl border border-charcoal text-charcoal px-5 py-3 text-sm font-semibold disabled:opacity-60 hover:bg-charcoal/5 transition-colors"
+                    >
+                      {shareLabel}
+                    </button>
+                  </div>
                 </div>
               </div>
 
               <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 md:p-8">
                 <h2 className="font-display text-2xl font-medium text-charcoal mb-4">How this works</h2>
-                <ul className="space-y-3 text-sm text-gray-700 leading-relaxed">
+                <ul className="list-disc list-inside space-y-3 text-sm text-gray-700 leading-relaxed">
                   <li>Share your referral code with friends.</li>
-                  <li>On their first login, they can enter your invite code.</li>
-                  <li>Each successful use credits ${REFERRAL_REWARD_AMOUNT} to your wallet.</li>
-                  <li>The invited user only receives the normal sign-up bonus.</li>
+                  <li>Your friend signs up using your referral code.</li>
+                  <li>
+                    You earn ${REFERRAL_REWARD_AMOUNT} for referral and your friend gets ${REFERRAL_REWARD_AMOUNT} for signup.
+                  </li>
                 </ul>
               </div>
             </div>

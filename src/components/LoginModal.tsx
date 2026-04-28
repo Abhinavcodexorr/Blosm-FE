@@ -31,6 +31,7 @@ export default function LoginModal() {
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const scrollPosRef = useRef(0);
+  const skipRestoreScrollRef = useRef(false);
 
   const inviteSeenStorageKey = (userId: string) => `blosm_invite_seen_${userId}`;
 
@@ -59,7 +60,8 @@ export default function LoginModal() {
       document.body.style.top = "";
       document.body.style.left = "";
       document.body.style.right = "";
-      window.scrollTo(0, scrollPosRef.current);
+      window.scrollTo(0, skipRestoreScrollRef.current ? 0 : scrollPosRef.current);
+      skipRestoreScrollRef.current = false;
     }
     return () => {
       document.body.style.overflow = "";
@@ -70,7 +72,8 @@ export default function LoginModal() {
     };
   }, [mounted, isOpen]);
 
-  const handleClose = () => {
+  const handleClose = (restoreScroll = true) => {
+    skipRestoreScrollRef.current = !restoreScroll;
     closeLogin();
     setStep("mobile");
     setMobile("");
@@ -85,15 +88,20 @@ export default function LoginModal() {
 
   const handleSuccessClose = () => {
     if (redirectAfterLogin) {
-      router.push(redirectAfterLogin);
+      const target = redirectAfterLogin;
       setRedirectAfterLogin(null);
+      handleClose(false);
+      router.push(target, { scroll: true });
+      return;
     } else if (
       pathname === "/contact" &&
       typeof window !== "undefined" &&
       sessionStorage.getItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY) === "1"
     ) {
       sessionStorage.removeItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY);
-      router.push("/");
+      handleClose(false);
+      router.push("/", { scroll: true });
+      return;
     }
     handleClose();
   };
@@ -162,8 +170,8 @@ export default function LoginModal() {
       // Keep verify-otp user payload if profile refresh fails.
     }
     setRedirectAfterLogin(null);
-    handleClose();
-    router.push("/");
+    handleClose(false);
+    router.push("/", { scroll: true });
   };
 
   const handleSkipInvite = async () => {
@@ -187,6 +195,10 @@ export default function LoginModal() {
       return;
     }
     const code = sanitizeMobileDigits(inviteCode);
+    if (!code) {
+      setError("Invite code is required.");
+      return;
+    }
     if (!isValidMobileDigits(code)) {
       setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits invite code.`);
       return;
@@ -218,7 +230,7 @@ export default function LoginModal() {
       onClick={(e) => e.target === e.currentTarget && handleClose()}
     >
       <div
-        className={`bg-white rounded-3xl shadow-2xl w-full max-w-3xl overflow-hidden ring-1 ring-black/5 ${closing ? "animate-modal-content-out" : "animate-modal-content"}`}
+        className={`bg-white rounded-3xl shadow-2xl w-full ${step === "invite" ? "max-w-xl" : "max-w-3xl"} overflow-hidden ring-1 ring-black/5 ${closing ? "animate-modal-content-out" : "animate-modal-content"}`}
         onClick={(e) => e.stopPropagation()}
       >
         {step === "mobile" && (
@@ -296,7 +308,7 @@ export default function LoginModal() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <div className="max-w-lg mx-auto">
+            <div className="max-w-md mx-auto">
               <div className="mb-8 pr-10">
                 <h2 className="font-display text-2xl font-medium text-charcoal">Verify OTP</h2>
                 <p className="text-gray-600 text-sm mt-1">
@@ -342,21 +354,9 @@ export default function LoginModal() {
 
         {step === "invite" && (
           <div className="relative p-8 md:p-12 pt-14 md:pt-12">
-            <button
-              type="button"
-              onClick={handleSkipInvite}
-              className="absolute top-4 right-4 z-20 px-3 py-1.5 text-xs text-gray-500 hover:text-charcoal rounded-full hover:bg-gray-100 transition-colors"
-              aria-label="Skip invite code"
-            >
-              Skip
-            </button>
             <div className="max-w-lg mx-auto">
-              <div className="mb-7 pr-10">
-                <p className="text-xs uppercase tracking-[0.25em] text-amber-800/70 mb-2">First login bonus step</p>
+              <div className="mb-7">
                 <h2 className="font-display text-2xl font-medium text-charcoal">Have an invite code?</h2>
-                <p className="text-gray-600 text-sm mt-1">
-                  Enter your friend&apos;s mobile number. Referrer gets <span className="font-semibold text-charcoal">$100</span>.
-                </p>
               </div>
 
               <form onSubmit={handleApplyInvite} className="space-y-5">
@@ -382,7 +382,7 @@ export default function LoginModal() {
                   disabled={loading}
                   className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-xl transition-all"
                 >
-                  {loading ? "Applying..." : "Apply invite & Continue"}
+                  {loading ? "Applying..." : "Apply"}
                 </button>
                 <button
                   type="button"
@@ -390,7 +390,7 @@ export default function LoginModal() {
                   disabled={loading}
                   className="w-full text-sm text-gray-500 hover:text-amber-700 transition-colors disabled:opacity-60"
                 >
-                  Continue without invite code
+                  Skip
                 </button>
               </form>
             </div>

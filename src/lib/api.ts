@@ -1,5 +1,40 @@
 import { API_BASE_URL } from "@/lib/config";
 
+export const AUTH_EXPIRED_EVENT = "blosm:auth-expired";
+
+function emitAuthExpired() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event(AUTH_EXPIRED_EVENT));
+  }
+}
+
+function getErrorMessageFromPayload(payload: unknown): string {
+  if (!payload || typeof payload !== "object") return "";
+  const p = payload as Record<string, unknown>;
+  if (typeof p.message === "string") return p.message;
+  if (typeof p.error === "string") return p.error;
+  if (p.error && typeof p.error === "object") {
+    const nested = p.error as Record<string, unknown>;
+    if (typeof nested.message === "string") return nested.message;
+  }
+  return "";
+}
+
+function maybeHandleAuthExpired(res: Response, payload: unknown): boolean {
+  if (res.status === 401 || res.status === 403) {
+    emitAuthExpired();
+    return true;
+  }
+  const msg = getErrorMessageFromPayload(payload).toLowerCase();
+  const mentionsAuth = /token|session|jwt|auth|login/.test(msg);
+  const indicatesExpiry = /expired|invalid|unauthori|forbidden/.test(msg);
+  if (mentionsAuth && indicatesExpiry) {
+    emitAuthExpired();
+    return true;
+  }
+  return false;
+}
+
 export async function sendOtp(mobile: string, countryCode: string) {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/send-otp`, {
     method: "POST",
@@ -166,6 +201,7 @@ export async function redeemInviteCode(token: string, inviteCode: string): Promi
 
   const json = await res.json().catch(() => ({}));
   if (!res.ok || (json && typeof json === "object" && "success" in json && (json as { success?: boolean }).success === false)) {
+    maybeHandleAuthExpired(res, json);
     const j = json as Record<string, unknown>;
     throw new Error(
       typeof j.message === "string"
@@ -202,9 +238,11 @@ export async function getProfile(token: string): Promise<PublicUser> {
   });
   const json = await res.json();
   if (!res.ok) {
+    maybeHandleAuthExpired(res, json);
     throw new Error(json.error || json.message || "Failed to fetch profile");
   }
   if (json.success === false) {
+    maybeHandleAuthExpired(res, json);
     throw new Error(json.message || json.error?.message || "Failed to fetch profile");
   }
   const payload = json.data !== undefined ? json.data : json;
@@ -313,8 +351,12 @@ export async function bookAppointment(body: BookAppointmentBody, token?: string 
     credentials: "include",
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || "Failed to book appointment");
+  if (!res.ok) {
+    maybeHandleAuthExpired(res, data);
+    throw new Error(data.error || data.message || "Failed to book appointment");
+  }
   if (data && typeof data === "object" && data.success === false) {
+    maybeHandleAuthExpired(res, data);
     throw new Error(data.message || data.error?.message || "Failed to book appointment");
   }
   return data;
@@ -361,8 +403,12 @@ export async function getMyBookings(token: string) {
     credentials: "include",
   });
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || "Failed to fetch bookings");
+  if (!res.ok) {
+    maybeHandleAuthExpired(res, data);
+    throw new Error(data.error || data.message || "Failed to fetch bookings");
+  }
   if (data && typeof data === "object" && data.success === false) {
+    maybeHandleAuthExpired(res, data);
     throw new Error(
       typeof data.message === "string" ? data.message : "Failed to fetch bookings"
     );
