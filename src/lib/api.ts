@@ -70,6 +70,17 @@ export type PublicUser = {
   walletHistory?: WalletHistoryEntry[];
 };
 
+export type VerifyOtpResult = {
+  token: string;
+  user: PublicUser;
+  isFirstLogin: boolean;
+};
+
+export type RedeemInviteCodeResult = {
+  message?: string;
+  creditedAmount?: number;
+};
+
 function parsePublicUser(raw: unknown): PublicUser {
   if (!raw || typeof raw !== "object") {
     throw new Error("Invalid profile response");
@@ -94,7 +105,27 @@ function parsePublicUser(raw: unknown): PublicUser {
   };
 }
 
-export async function verifyOtp(mobile: string, countryCode: string, otp: string) {
+function parseBooleanField(raw: Record<string, unknown>, keys: string[]): boolean {
+  for (const k of keys) {
+    const v = raw[k];
+    if (typeof v === "boolean") return v;
+  }
+  return false;
+}
+
+function parseNumberField(raw: Record<string, unknown>, keys: string[]): number | undefined {
+  for (const k of keys) {
+    const v = raw[k];
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+  }
+  return undefined;
+}
+
+export async function verifyOtp(mobile: string, countryCode: string, otp: string): Promise<VerifyOtpResult> {
   const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -103,11 +134,65 @@ export async function verifyOtp(mobile: string, countryCode: string, otp: string
   });
   const json = await res.json();
   if (!res.ok || !json.success) throw new Error(json.message || json.error?.message || "Invalid OTP");
-  const { token, user: rawUser } = json.data || {};
+  const data = json.data && typeof json.data === "object" ? (json.data as Record<string, unknown>) : {};
+  const token = data.token;
+  const rawUser = data.user;
   if (!token || rawUser == null || typeof rawUser !== "object") {
     throw new Error("Invalid response");
   }
-  return { token, user: parsePublicUser(rawUser) };
+  const isFirstLogin =
+    parseBooleanField(data, ["isFirstLogin", "isNewUser", "isNew", "firstLogin"]) ||
+    (rawUser && typeof rawUser === "object"
+      ? parseBooleanField(rawUser as Record<string, unknown>, ["isFirstLogin", "isNewUser", "isNew", "firstLogin"])
+      : false);
+  return { token: String(token), user: parsePublicUser(rawUser), isFirstLogin };
+}
+
+export async function redeemInviteCode(token: string, inviteCode: string): Promise<RedeemInviteCodeResult> {
+  const cleanedCode = inviteCode.replace(/\D/g, "");
+  if (!cleanedCode) {
+    throw new Error("Enter a valid invite code");
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/referrals/redeem`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ inviteCode: cleanedCode }),
+    credentials: "include",
+  });
+
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || (json && typeof json === "object" && "success" in json && (json as { success?: boolean }).success === false)) {
+    const j = json as Record<string, unknown>;
+    throw new Error(
+      typeof j.message === "string"
+        ? j.message
+        : typeof j.error === "string"
+          ? j.error
+          : typeof j.error === "object" && j.error && typeof (j.error as { message?: unknown }).message === "string"
+            ? String((j.error as { message?: unknown }).message)
+            : "Failed to apply invite code"
+    );
+  }
+
+  const data = json && typeof json === "object" && "data" in json && json.data && typeof json.data === "object"
+    ? (json.data as Record<string, unknown>)
+    : {};
+
+  return {
+    message:
+      typeof data.message === "string"
+        ? data.message
+        : typeof (json as Record<string, unknown>).message === "string"
+          ? String((json as Record<string, unknown>).message)
+          : undefined,
+    creditedAmount:
+      parseNumberField(data, ["creditedAmount", "amount", "rewardAmount"]) ??
+      parseNumberField(json as Record<string, unknown>, ["creditedAmount", "amount", "rewardAmount"]),
+  };
 }
 
 export async function getProfile(token: string): Promise<PublicUser> {

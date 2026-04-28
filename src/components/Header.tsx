@@ -9,6 +9,7 @@ import { useLoginModal } from '@/context/LoginModalContext'
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/services', label: 'Services' },
+  { href: '/refer-and-earn', label: 'Refer & Earn' },
   { href: '/contact', label: 'Contact' },
 ]
 
@@ -144,6 +145,16 @@ export default function Header() {
                   </svg>
                 </Link>
                 <Link
+                  href="/refer-and-earn"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-amber-50/60 transition-colors border-b border-gray-100"
+                >
+                  <span className="text-sm font-semibold text-charcoal">Refer & Earn</span>
+                  <svg className="h-4 w-4 shrink-0 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link
                   href="/wallet"
                   onClick={() => setProfileOpen(false)}
                   className="flex items-center justify-between gap-3 px-4 py-3 hover:bg-amber-50/60 transition-colors border-b border-gray-100"
@@ -218,6 +229,16 @@ export default function Header() {
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     Appointments
+                    <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </Link>
+                  <Link
+                    href="/refer-and-earn"
+                    className="flex items-center justify-between gap-2 text-sm font-semibold text-charcoal-600 hover:text-amber-800 py-2"
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    Refer & Earn
                     <svg className="h-4 w-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>

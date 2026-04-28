@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useLoginModal } from "@/context/LoginModalContext";
-import { sendOtp, verifyOtp } from "@/lib/api";
+import { getProfile, redeemInviteCode, sendOtp, verifyOtp } from "@/lib/api";
 import PhoneCountryField from "@/components/PhoneCountryField";
 import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 import {
@@ -21,12 +21,18 @@ export default function LoginModal() {
   const [mobile, setMobile] = useState("");
   const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [otp, setOtp] = useState("");
-  const [step, setStep] = useState<"mobile" | "otp">("mobile");
+  const [step, setStep] = useState<"mobile" | "otp" | "invite">("mobile");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [pendingToken, setPendingToken] = useState<string | null>(null);
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
   const scrollPosRef = useRef(0);
+
+  const inviteSeenStorageKey = (userId: string) => `blosm_invite_seen_${userId}`;
 
   useEffect(() => {
     if (isOpen) {
@@ -70,6 +76,10 @@ export default function LoginModal() {
     setMobile("");
     setCountrySelect(getDefaultCountrySelectValue());
     setOtp("");
+    setInviteCode("");
+    setInviteMessage("");
+    setPendingToken(null);
+    setPendingUserId(null);
     setError("");
   };
 
@@ -116,15 +126,83 @@ export default function LoginModal() {
     }
     setLoading(true);
     try {
-      const { token, user } = await verifyOtp(
+      const { token, user, isFirstLogin } = await verifyOtp(
         sanitizeMobileDigits(mobile),
         dialFromSelection(countrySelect),
         otp
       );
-      setAuth(token, user);
-      handleSuccessClose();
+      const seenInviteStep =
+        typeof window !== "undefined" &&
+        user?._id &&
+        localStorage.getItem(inviteSeenStorageKey(user._id)) === "1";
+      if (isFirstLogin && user?._id && !seenInviteStep) {
+        setPendingToken(token);
+        setPendingUserId(user._id);
+        setAuth(token, user);
+        setStep("invite");
+      } else {
+        setAuth(token, user);
+        handleSuccessClose();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid or expired OTP");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completeLoginAfterInviteStep = async (token: string, userId: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(inviteSeenStorageKey(userId), "1");
+    }
+    try {
+      const fresh = await getProfile(token);
+      setAuth(token, fresh);
+    } catch {
+      // Keep verify-otp user payload if profile refresh fails.
+    }
+    setRedirectAfterLogin(null);
+    handleClose();
+    router.push("/");
+  };
+
+  const handleSkipInvite = async () => {
+    if (!pendingToken || !pendingUserId) {
+      handleSuccessClose();
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      await completeLoginAfterInviteStep(pendingToken, pendingUserId);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApplyInvite = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pendingToken || !pendingUserId) {
+      handleSuccessClose();
+      return;
+    }
+    const code = sanitizeMobileDigits(inviteCode);
+    if (!isValidMobileDigits(code)) {
+      setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits invite code.`);
+      return;
+    }
+    setLoading(true);
+    setError("");
+    setInviteMessage("");
+    try {
+      const result = await redeemInviteCode(pendingToken, code);
+      setInviteMessage(
+        result.message ||
+          `Invite applied successfully. Referrer gets $${result.creditedAmount ?? 100}.`
+      );
+      await completeLoginAfterInviteStep(pendingToken, pendingUserId);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to apply invite code");
     } finally {
       setLoading(false);
     }
@@ -258,6 +336,63 @@ export default function LoginModal() {
                 Change number
               </button>
             </form>
+            </div>
+          </div>
+        )}
+
+        {step === "invite" && (
+          <div className="relative p-8 md:p-12 pt-14 md:pt-12">
+            <button
+              type="button"
+              onClick={handleSkipInvite}
+              className="absolute top-4 right-4 z-20 px-3 py-1.5 text-xs text-gray-500 hover:text-charcoal rounded-full hover:bg-gray-100 transition-colors"
+              aria-label="Skip invite code"
+            >
+              Skip
+            </button>
+            <div className="max-w-lg mx-auto">
+              <div className="mb-7 pr-10">
+                <p className="text-xs uppercase tracking-[0.25em] text-amber-800/70 mb-2">First login bonus step</p>
+                <h2 className="font-display text-2xl font-medium text-charcoal">Have an invite code?</h2>
+                <p className="text-gray-600 text-sm mt-1">
+                  Enter your friend&apos;s mobile number. Referrer gets <span className="font-semibold text-charcoal">$100</span>.
+                </p>
+              </div>
+
+              <form onSubmit={handleApplyInvite} className="space-y-5">
+                <div>
+                  <label htmlFor="invite-code" className="block text-sm font-medium text-charcoal mb-2">
+                    Invite code
+                  </label>
+                  <input
+                    id="invite-code"
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={MOBILE_DIGITS_LEN}
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(sanitizeMobileDigits(e.target.value))}
+                    placeholder="e.g. 410933555"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-base"
+                  />
+                </div>
+                {error && <p className="text-sm text-red-600">{error}</p>}
+                {!error && inviteMessage && <p className="text-sm text-emerald-700">{inviteMessage}</p>}
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-xl transition-all"
+                >
+                  {loading ? "Applying..." : "Apply invite & Continue"}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkipInvite}
+                  disabled={loading}
+                  className="w-full text-sm text-gray-500 hover:text-amber-700 transition-colors disabled:opacity-60"
+                >
+                  Continue without invite code
+                </button>
+              </form>
             </div>
           </div>
         )}
