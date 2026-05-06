@@ -255,16 +255,37 @@ export async function getProfile(token: string): Promise<PublicUser> {
   return parsePublicUser(userPayload);
 }
 
+/** One row inside `serviceSelections` (multi-service booking). */
+export type AppointmentServiceSelection = {
+  serviceId: string;
+  subheading: string;
+  serviceItemName: string;
+};
+
+/**
+ * POST /appointments body — either one line (`serviceId` + `subheading` + `serviceItemName`)
+ * or multiple (`serviceSelections`). Do not send both shapes at once.
+ */
 export type BookAppointmentBody = {
   name: string;
   email: string;
   mobile: string;
   countryCode?: string;
-  serviceId: string;
   date: string; // YYYY-MM-DD
   /** Optional; salon may confirm time later. */
   time?: string;
   notes?: string;
+  /**
+   * Parent salon **service** document id (API menu category / `services._id`).
+   * Some backends require `service` or `serviceId` at the root; we send both when needed.
+   */
+  service?: string;
+  /** Treatment / line id when distinct from parent `service`, else same as `service`. */
+  serviceId?: string;
+  subheading?: string;
+  serviceItemName?: string;
+  /** Multiple selections. */
+  serviceSelections?: AppointmentServiceSelection[];
 };
 
 export type SalonAvailability = {
@@ -351,13 +372,23 @@ export async function bookAppointment(body: BookAppointmentBody, token?: string 
     credentials: "include",
   });
   const data = await res.json();
+  const bookingErrMsg = (() => {
+    if (typeof data?.message === "string" && data.message.trim()) return data.message.trim();
+    const e = data?.error;
+    if (typeof e === "string" && e.trim()) return e.trim();
+    if (e && typeof e === "object" && typeof (e as { message?: unknown }).message === "string") {
+      const m = (e as { message: string }).message.trim();
+      if (m) return m;
+    }
+    return "Failed to book appointment";
+  })();
   if (!res.ok) {
     maybeHandleAuthExpired(res, data);
-    throw new Error(data.error || data.message || "Failed to book appointment");
+    throw new Error(bookingErrMsg);
   }
   if (data && typeof data === "object" && data.success === false) {
     maybeHandleAuthExpired(res, data);
-    throw new Error(data.message || data.error?.message || "Failed to book appointment");
+    throw new Error(bookingErrMsg);
   }
   return data;
 }

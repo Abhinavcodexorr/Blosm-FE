@@ -19,6 +19,10 @@ type Props = {
   helperText?: string;
   /** Show digit count while typing (8–11 digits). */
   showDigitMeter?: boolean;
+  /** Border/focus theme for wrapper. */
+  borderTone?: "amber" | "black";
+  /** Restrict country select to one dial code (e.g. `+61`). */
+  lockToDialCode?: string;
 };
 
 export default function PhoneCountryField({
@@ -33,6 +37,8 @@ export default function PhoneCountryField({
   placeholder = "",
   helperText,
   showDigitMeter = false,
+  borderTone = "amber",
+  lockToDialCode,
 }: Props) {
   const hintId = useId();
   const meterId = useId();
@@ -44,14 +50,27 @@ export default function PhoneCountryField({
   const showFooter = Boolean(helperText) || showMeter;
   const describedBy = [helperText ? hintId : "", showMeter ? meterId : ""].filter(Boolean).join(" ") || undefined;
 
+  const wrapperToneClass =
+    borderTone === "black"
+      ? "border-black/80 focus-within:border-black hover:border-black"
+      : "border-gray-200 focus-within:border-amber-500 hover:border-gray-300";
+  const wrapperRingClass = borderTone === "black" ? "focus-within:ring-black/20" : "focus-within:ring-amber-500/35";
+  const allOptions = getCountryDialOptions();
+  const filteredOptions = lockToDialCode
+    ? allOptions.filter((o) => o.dial === lockToDialCode)
+    : allOptions;
+  const selectOptions = filteredOptions.length ? filteredOptions : allOptions;
+  const forcedValue = lockToDialCode
+    ? selectOptions.find((o) => o.value === countrySelect)?.value ?? selectOptions[0]?.value ?? countrySelect
+    : countrySelect;
+  const isSelectLocked = Boolean(lockToDialCode);
+
   return (
     <div>
       <label htmlFor={id} className="block text-sm font-medium text-charcoal mb-2">
         {label}
       </label>
-      <div
-        className={`flex ${r} border border-gray-200 bg-white overflow-hidden shadow-sm transition-all focus-within:border-amber-500 focus-within:ring-2 focus-within:ring-amber-500/35 hover:border-gray-300`}
-      >
+      <div className={`flex ${r} border bg-white overflow-hidden shadow-sm transition-all focus-within:ring-2 ${wrapperToneClass} ${wrapperRingClass}`}>
         <div className="relative shrink-0 border-r border-gray-200 bg-gradient-to-b from-rose-50/80 to-rose-50/30">
           <span className="pointer-events-none absolute left-2 top-1/2 z-[1] -translate-y-1/2 text-gray-400" aria-hidden>
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -64,15 +83,20 @@ export default function PhoneCountryField({
             </svg>
           </span>
           <select
-            value={countrySelect}
+            value={forcedValue}
             onChange={(e) => onCountryChange(e.target.value)}
-            className={`w-[5.75rem] border-0 bg-transparent sm:w-[6.25rem] ${py} pl-8 pr-7 text-sm font-semibold tabular-nums text-charcoal focus:outline-none focus:ring-0 cursor-pointer appearance-none bg-[length:12px] bg-[right_0.4rem_center] bg-no-repeat`}
+            className={`w-[5.75rem] border-0 bg-transparent sm:w-[6.25rem] ${py} pl-8 pr-7 text-sm font-semibold tabular-nums text-charcoal focus:outline-none focus:ring-0 appearance-none bg-[length:12px] bg-[right_0.4rem_center] bg-no-repeat ${
+              isSelectLocked ? "cursor-default" : "cursor-pointer"
+            }`}
             style={{
-              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
+              backgroundImage: isSelectLocked
+                ? "none"
+                : `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%236b7280'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`,
             }}
             aria-label="Country code"
+            disabled={isSelectLocked}
           >
-            {getCountryDialOptions().map((c) => (
+            {selectOptions.map((c) => (
               <option key={c.value} value={c.value} title={c.hint}>
                 {c.label}
               </option>

@@ -13,18 +13,22 @@ function formatMinutes(mins: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
-const SLOT_MINUTES = 30;
+/** Step between offered start times (e.g. 09:00, 09:15, 09:30 …). */
+export const SLOT_STEP_MINUTES = 15;
+
+/** For “today”, a slot is bookable only if it starts after now plus this buffer. */
+export const BOOKING_MIN_LEAD_MINUTES = 15;
 
 /**
- * After the API returns `availableFrom` and `availableTo`, build 30-minute slot start times
- * only inside that window (first slot at `availableFrom`, last slot still fits before `availableTo`).
+ * After the API returns `availableFrom` and `availableTo`, build slot start times every
+ * {@link SLOT_STEP_MINUTES} inside that window (last start still fits before `availableTo`).
  */
-export function halfHourSlotsInWindow(availableFrom: string, availableTo: string): string[] {
+export function slotsInOpeningWindow(availableFrom: string, availableTo: string): string[] {
   const start = parseHHMM(availableFrom);
   const end = parseHHMM(availableTo);
   if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return [];
   const slots: string[] = [];
-  for (let t = start; t + SLOT_MINUTES <= end; t += SLOT_MINUTES) {
+  for (let t = start; t + SLOT_STEP_MINUTES <= end; t += SLOT_STEP_MINUTES) {
     slots.push(formatMinutes(t));
   }
   return slots;
@@ -45,8 +49,8 @@ export function localDateYmd(d: Date): string {
 }
 
 /**
- * For the selected day, a slot is unavailable (show disabled) when current time is at or past that slot start.
- * Only applies when the selected date is “today” in the user’s local calendar (same as `<input type="date">`).
+ * For the selected day, a slot is unavailable when it is “today” (local calendar) and the slot
+ * start is not after `now` plus {@link BOOKING_MIN_LEAD_MINUTES} (past or too soon to book).
  */
 export function isSlotTimePassedForSelectedDate(
   selectedDateYmd: string,
@@ -59,5 +63,21 @@ export function isSlotTimePassedForSelectedDate(
   if (day !== today) return false;
   const slotAt = slotStartDate(day, slot);
   if (Number.isNaN(slotAt.getTime())) return false;
-  return slotAt.getTime() <= now.getTime();
+  const earliest = now.getTime() + BOOKING_MIN_LEAD_MINUTES * 60 * 1000;
+  return slotAt.getTime() <= earliest;
+}
+
+/** Minutes since midnight → `HH:mm` (wraps within 24h). */
+export function formatMinutesAsSlotTime(minsFromMidnight: number): string {
+  const wrap = ((minsFromMidnight % (24 * 60)) + (24 * 60)) % (24 * 60);
+  const h = Math.floor(wrap / 60);
+  const m = wrap % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/** End time `HH:mm` for a slot start plus duration in minutes. */
+export function slotEndTimeHHmm(slotStartHHmm: string, durationMinutes: number): string {
+  const start = parseHHMM(slotStartHHmm);
+  if (!Number.isFinite(start) || durationMinutes <= 0) return "";
+  return formatMinutesAsSlotTime(start + durationMinutes);
 }

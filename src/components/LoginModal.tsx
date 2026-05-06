@@ -237,7 +237,7 @@ export default function LoginModal() {
           <div className="relative">
             <button
               type="button"
-              onClick={handleClose}
+              onClick={() => handleClose()}
               className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-white/80 transition-all"
               aria-label="Close"
             >
@@ -300,7 +300,7 @@ export default function LoginModal() {
           <div className="relative p-8 md:p-12 pt-14 md:pt-12">
             <button
               type="button"
-              onClick={handleClose}
+              onClick={() => handleClose()}
               className="absolute top-4 right-4 z-20 p-2 text-gray-400 hover:text-charcoal rounded-full hover:bg-gray-100 transition-colors"
               aria-label="Close"
             >

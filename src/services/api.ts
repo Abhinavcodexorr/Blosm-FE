@@ -1,12 +1,36 @@
 import { API_BASE_URL } from "@/lib/config";
 
+/** Priced line item under a subheading (booking menu). */
+export type ApiBookingServiceItem = {
+  name: string;
+  price: number;
+  _id?: string;
+  /** Minutes (number) or a ready-made label (string), e.g. 15 or "15 min" */
+  duration?: number | string;
+  /** Time / duration from API: number = minutes, string = label or digits e.g. `"15"` → `15 min` */
+  time?: string | number;
+  /** Some backends use this key for minutes */
+  durationMinutes?: number;
+};
+
+export type ApiBookingSubheading = {
+  _id: string;
+  subheading: string;
+  items: ApiBookingServiceItem[];
+};
+
 export type ApiService = {
   _id: string;
-  title: string;
+  /** Legacy list page title */
+  title?: string;
+  /** Booking menu heading (may include emoji), e.g. "👁️ Eyelash Extensions" */
+  heading?: string;
   description: string;
   image: string;
   alt?: string;
   items?: string[];
+  /** Nested booking options when present */
+  subheadings?: ApiBookingSubheading[];
   isActive?: boolean;
 };
 
@@ -26,6 +50,10 @@ async function fetchServices(): Promise<ApiService[]> {
   return json.data || [];
 }
 
+function serviceDisplayTitle(s: ApiService): string {
+  return (s.heading ?? s.title ?? "").trim() || "Service";
+}
+
 export async function getServices(): Promise<
   { title: string; description: string; image: string; tag?: string | null; items?: string[] }[]
 > {
@@ -33,7 +61,7 @@ export async function getServices(): Promise<
   return data
     .filter((s) => s.isActive !== false)
     .map((s) => ({
-      title: s.title,
+      title: serviceDisplayTitle(s),
       description: s.description,
       image: s.image || "",
       tag: null as string | null,
@@ -49,10 +77,10 @@ export async function getCategories(): Promise<
     .filter((s) => s.isActive !== false)
     .map((s) => ({
       _id: s._id,
-      name: s.title,
+      name: serviceDisplayTitle(s),
       description: s.description,
       image: s.image || "",
-      alt: s.alt || s.title,
+      alt: s.alt || serviceDisplayTitle(s),
       items: s.items || [],
     }));
 }
@@ -62,16 +90,200 @@ export async function getServiceTitles(): Promise<string[]> {
   const titles: string[] = [];
   for (const s of data) {
     if (s.isActive !== false) {
-      titles.push(s.title);
+      titles.push(serviceDisplayTitle(s));
       if (s.items?.length) titles.push(...s.items);
+      if (s.subheadings?.length) {
+        for (const sub of s.subheadings) {
+          for (const it of sub.items ?? []) {
+            const n = it?.name?.trim();
+            if (n) titles.push(n);
+          }
+        }
+      }
     }
   }
   return Array.from(new Set(titles));
 }
 
-export async function getServicesForBooking(): Promise<{ id: string; title: string }[]> {
+/** One selectable row in the booking UI (checkbox). */
+export type BookingServiceLine = {
+  id: string;
+  /** Sent as `serviceId` on the appointment API (item id when ObjectId-shaped, else parent service id). */
+  bookingServiceId: string;
+  /** API `subheadings[].subheading` (e.g. "Cut & finish"); legacy rows use category heading. */
+  subheading: string;
+  name: string;
+  price: number;
+  /** From API `time` / `duration` / `durationMinutes` — empty if not provided */
+  durationLabel: string;
+  /** Parsed minutes for summing total appointment length */
+  durationMinutes: number;
+};
+
+/** Accordion group: API category with a display heading. */
+export type BookingServiceCategory = {
+  id: string;
+  heading: string;
+  lines: BookingServiceLine[];
+};
+
+function lineItemId(subheadingId: string, itemIndex: number, item: ApiBookingServiceItem): string {
+  if (item._id && String(item._id).trim()) return String(item._id);
+  return `${subheadingId}:${itemIndex}:${item.name}`;
+}
+
+/** 24-char hex, typical Mongo ObjectId (used for API `serviceId` when item has its own id). */
+function isLikelyMongoObjectId(s: string): boolean {
+  return /^[a-fA-F0-9]{24}$/.test(s.trim());
+}
+
+/**
+ * Value for appointment `serviceId`: item id when it looks like ObjectId, otherwise parent service `_id`.
+ */
+function bookingServiceIdForLine(serviceId: string, item: ApiBookingServiceItem): string {
+  const raw = item._id != null ? String(item._id).trim() : "";
+  if (raw && isLikelyMongoObjectId(raw)) return raw;
+  return serviceId;
+}
+
+/** If the API sends a bare number as text (e.g. "15"), show "15 min". */
+function normalizeMinutesDisplay(raw: string): string {
+  const s = raw.trim();
+  if (!s) return "";
+  if (/^\d+$/.test(s)) return `${s} min`;
+  return s;
+}
+
+/** Builds a single display label for duration / time from common API shapes. */
+export function formatServiceItemDurationLabel(item: ApiBookingServiceItem): string {
+  if (item.time != null) {
+    if (typeof item.time === "number" && Number.isFinite(item.time) && item.time > 0) {
+      return `${item.time} min`;
+    }
+    const timeStr = String(item.time).trim();
+    if (timeStr) return normalizeMinutesDisplay(timeStr);
+  }
+
+  const mins = item.durationMinutes;
+  if (typeof mins === "number" && Number.isFinite(mins) && mins > 0) {
+    return `${mins} min`;
+  }
+
+  const d = item.duration;
+  if (typeof d === "number" && Number.isFinite(d) && d > 0) {
+    return `${d} min`;
+  }
+  if (typeof d === "string" && d.trim()) {
+    return normalizeMinutesDisplay(d.trim());
+  }
+
+  return "";
+}
+
+/** First integer in a string (e.g. "15 min" → 15, "60–90" → 60). */
+function firstPositiveIntInString(s: string): number | null {
+  const m = s.match(/(\d+)/);
+  if (!m) return null;
+  const n = parseInt(m[1], 10);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * Minutes for one service line (for summing booking length).
+ * Uses `durationMinutes`, numeric `time` / `duration`, or digits in string fields.
+ */
+export function parseServiceItemDurationMinutes(item: ApiBookingServiceItem): number {
+  if (
+    item.durationMinutes != null &&
+    typeof item.durationMinutes === "number" &&
+    Number.isFinite(item.durationMinutes) &&
+    item.durationMinutes > 0
+  ) {
+    return Math.round(item.durationMinutes);
+  }
+  if (item.time != null) {
+    if (typeof item.time === "number" && Number.isFinite(item.time) && item.time > 0) {
+      return Math.round(item.time);
+    }
+    const ts = String(item.time).trim();
+    if (/^\d+$/.test(ts)) return parseInt(ts, 10);
+    const n = firstPositiveIntInString(ts);
+    if (n != null) return n;
+  }
+  if (item.duration != null) {
+    if (typeof item.duration === "number" && Number.isFinite(item.duration) && item.duration > 0) {
+      return Math.round(item.duration);
+    }
+    const ds = String(item.duration).trim();
+    if (/^\d+$/.test(ds)) return parseInt(ds, 10);
+    const n = firstPositiveIntInString(ds);
+    if (n != null) return n;
+  }
+  return 0;
+}
+
+/** Duration · price for booking UI rows (skips empty parts). */
+export function formatBookingLineMeta(durationLabel: string, priceFormatted: string): string {
+  const dur = (durationLabel ?? "").trim();
+  const price = (priceFormatted ?? "").trim();
+  const parts = [dur || null, price || null].filter(Boolean) as string[];
+  return parts.length ? parts.join(" · ") : "—";
+}
+
+function categoryFromSubheadings(service: ApiService): BookingServiceCategory | null {
+  const subs = service.subheadings;
+  if (!subs?.length) return null;
+  const heading = (service.heading ?? service.title ?? "").trim();
+  if (!heading) return null;
+  const lines: BookingServiceLine[] = [];
+  for (const sub of subs) {
+    const subId = sub._id;
+    if (!subId || !Array.isArray(sub.items)) continue;
+    const subLabel = (sub.subheading ?? "").trim() || heading;
+    sub.items.forEach((item, idx) => {
+      if (!item?.name?.trim()) return;
+      lines.push({
+        id: lineItemId(subId, idx, item),
+        bookingServiceId: bookingServiceIdForLine(service._id, item),
+        subheading: subLabel,
+        name: item.name.trim(),
+        price: typeof item.price === "number" && !Number.isNaN(item.price) ? item.price : 0,
+        durationLabel: formatServiceItemDurationLabel(item),
+        durationMinutes: parseServiceItemDurationMinutes(item),
+      });
+    });
+  }
+  if (!lines.length) return null;
+  return { id: service._id, heading, lines };
+}
+
+/** Legacy: single “service” = whole category. */
+function categoryLegacy(service: ApiService): BookingServiceCategory {
+  const heading = (service.heading ?? service.title ?? "Service").trim();
+  return {
+    id: service._id,
+    heading,
+    lines: [
+      {
+        id: service._id,
+        bookingServiceId: service._id,
+        subheading: heading,
+        name: heading,
+        price: 0,
+        durationLabel: "",
+        durationMinutes: 0,
+      },
+    ],
+  };
+}
+
+/**
+ * Services for the appointment booking picker.
+ * Prefers `heading` + `subheadings[].items` when the API returns that shape; otherwise one line per category.
+ */
+export async function getServicesForBooking(): Promise<BookingServiceCategory[]> {
   const data = await fetchServices();
   return data
     .filter((s) => s.isActive !== false)
-    .map((s) => ({ id: s._id, title: s.title }));
+    .map((s) => categoryFromSubheadings(s) ?? categoryLegacy(s));
 }
