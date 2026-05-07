@@ -26,6 +26,7 @@ export default function LoginModal() {
   const [error, setError] = useState("");
   const [inviteCode, setInviteCode] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteAction, setInviteAction] = useState<"apply" | "skip" | null>(null);
   const [pendingToken, setPendingToken] = useState<string | null>(null);
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -81,6 +82,7 @@ export default function LoginModal() {
     setOtp("");
     setInviteCode("");
     setInviteMessage("");
+    setInviteAction(null);
     setPendingToken(null);
     setPendingUserId(null);
     setError("");
@@ -179,11 +181,13 @@ export default function LoginModal() {
       handleSuccessClose();
       return;
     }
+    setInviteAction("skip");
     setLoading(true);
     setError("");
     try {
       await completeLoginAfterInviteStep(pendingToken, pendingUserId);
     } finally {
+      setInviteAction(null);
       setLoading(false);
     }
   };
@@ -203,6 +207,7 @@ export default function LoginModal() {
       setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits invite code.`);
       return;
     }
+    setInviteAction("apply");
     setLoading(true);
     setError("");
     setInviteMessage("");
@@ -216,6 +221,7 @@ export default function LoginModal() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to apply invite code");
     } finally {
+      setInviteAction(null);
       setLoading(false);
     }
   };
@@ -382,7 +388,7 @@ export default function LoginModal() {
                   disabled={loading}
                   className="w-full py-4 bg-amber-500 hover:bg-amber-600 disabled:opacity-70 text-white font-semibold rounded-xl transition-all"
                 >
-                  {loading ? "Applying..." : "Apply"}
+                  {loading && inviteAction === "apply" ? "Applying..." : "Apply"}
                 </button>
                 <button
                   type="button"
@@ -390,7 +396,7 @@ export default function LoginModal() {
                   disabled={loading}
                   className="w-full text-sm text-gray-500 hover:text-amber-700 transition-colors disabled:opacity-60"
                 >
-                  Skip
+                  {loading && inviteAction === "skip" ? "Skipping..." : "Skip"}
                 </button>
               </form>
             </div>
