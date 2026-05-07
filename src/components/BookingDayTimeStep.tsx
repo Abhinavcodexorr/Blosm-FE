@@ -2,9 +2,10 @@
 
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
-import { isSlotTimePassedForSelectedDate, slotEndTimeHHmm } from "@/lib/availabilitySlots";
+import { isSlotTimePassedForSelectedDate, parseHHMM, slotEndTimeHHmm, SLOT_STEP_MINUTES } from "@/lib/availabilitySlots";
 import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 import { formatBookingLineMeta } from "@/services/api";
+import type { BookedSlot } from "@/lib/api";
 
 function pad(n: number) {
   return String(n).padStart(2, "0");
@@ -65,6 +66,16 @@ function formatLongHeading(ymd: string): string {
   });
 }
 
+function formatSlotAmPm(hhmm: string): string {
+  const [hRaw, mRaw] = hhmm.split(":");
+  const h = Number(hRaw);
+  const m = Number(mRaw);
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
+  const period = h >= 12 ? "PM" : "AM";
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
+}
+
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export type BookingSummaryLine = {
@@ -98,6 +109,8 @@ type Props = {
   totalSelectedDurationMinutes?: number;
   /** Shown when Continue is pressed without date/time */
   stepError?: string;
+  /** Existing bookings used to disable overlapping times for selected date. */
+  bookedSlots?: BookedSlot[];
 };
 
 export default function BookingDayTimeStep({
@@ -118,6 +131,7 @@ export default function BookingDayTimeStep({
   summaryLines,
   totalSelectedDurationMinutes = 0,
   stepError,
+  bookedSlots = [],
 }: Props) {
   const minDate = useMemo(() => parseYmd(minYmd), [minYmd]);
   const maxDate = useMemo(() => parseYmd(maxYmd), [maxYmd]);
@@ -199,6 +213,31 @@ export default function BookingDayTimeStep({
     return baseSlots.filter((slot) => !isSlotTimePassedForSelectedDate(date, slot, now));
   }, [baseSlots, date, clockTick]);
 
+  const bookedRangesForDate = useMemo(() => {
+    if (!date) return [];
+    return bookedSlots
+      .filter((row) => row.date === date)
+      .map((row) => ({ start: parseHHMM(row.start), end: parseHHMM(row.end) }))
+      .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start);
+  }, [bookedSlots, date]);
+
+  function isOverlappingBookedRange(slot: string): boolean {
+    if (!date || bookedRangesForDate.length === 0) return false;
+    const slotStart = parseHHMM(slot);
+    if (!Number.isFinite(slotStart)) return false;
+    const duration = totalSelectedDurationMinutes > 0 ? totalSelectedDurationMinutes : SLOT_STEP_MINUTES;
+    const slotEnd = slotStart + duration;
+    return bookedRangesForDate.some((r) => slotStart < r.end && slotEnd > r.start);
+  }
+
+  useEffect(() => {
+    if (!date || !time) return;
+    const now = new Date();
+    const nowInvalid = isSlotTimePassedForSelectedDate(date, time, now);
+    const bookedInvalid = isOverlappingBookedRange(time);
+    if (nowInvalid || bookedInvalid) onTimeChange("");
+  }, [date, time, clockTick, bookedRangesForDate, totalSelectedDurationMinutes, onTimeChange]);
+
   return (
     <section className="relative mx-auto flex w-full max-w-[81rem] flex-col lg:h-full lg:min-h-0">
       <div
@@ -272,8 +311,8 @@ export default function BookingDayTimeStep({
                 </button>
               </div>
 
-                  <div role="grid" aria-label="Choose day" className="mx-auto max-w-[15.25rem] select-none sm:max-w-[16.25rem]">
-                    <div className="mb-1 grid grid-cols-7 gap-0.5">
+                  <div role="grid" aria-label="Choose day" className="mx-auto w-full max-w-[17.5rem] select-none sm:max-w-[19rem]">
+                    <div className="mb-2 grid grid-cols-7 gap-1">
                   {WEEK_DAYS.map((d) => (
                     <div
                       key={d}
@@ -283,10 +322,10 @@ export default function BookingDayTimeStep({
                     </div>
                   ))}
                     </div>
-                    <div className="grid grid-cols-7 gap-0.5">
+                    <div className="grid grid-cols-7 gap-1">
                   {grid.map((cell, i) => {
                     if (cell.ymd == null || cell.dayNum == null) {
-                      return <div key={`e-${i}`} className="aspect-square min-h-[2rem]" />;
+                      return <div key={`e-${i}`} className="aspect-square min-h-[2.45rem]" />;
                     }
                     const selected = date === cell.ymd;
                     return (
@@ -302,7 +341,7 @@ export default function BookingDayTimeStep({
                           }
                         }}
                         aria-selected={selected}
-                        className={`mx-auto flex aspect-square min-h-[2rem] w-full max-w-[2.2rem] items-center justify-center rounded-full text-[12px] font-semibold transition-all duration-200 ${
+                        className={`mx-auto flex aspect-square min-h-[2.45rem] w-full max-w-[2.6rem] items-center justify-center rounded-full text-[13px] font-semibold transition-all duration-200 ${
                           cell.disabled
                             ? "cursor-not-allowed text-gray-300"
                             : selected
@@ -322,7 +361,7 @@ export default function BookingDayTimeStep({
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-white via-white to-amber-50/20 shadow-[0_14px_36px_-22px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.03]">
+            <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-gradient-to-b from-white via-white to-amber-50/20 shadow-[0_14px_36px_-22px_rgba(0,0,0,0.12)] ring-1 ring-black/[0.03] lg:h-[70vh] lg:max-h-[70vh]">
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden p-4 sm:p-5">
               {date ? (
                 <div className="mb-5 flex flex-wrap items-end justify-between gap-2">
@@ -394,15 +433,19 @@ export default function BookingDayTimeStep({
                       void clockTick;
                       const now = new Date();
                       const passed = date ? isSlotTimePassedForSelectedDate(date, slot, now) : false;
-                      const selected = time === slot && !passed;
+                      const overlapsBooked = isOverlappingBookedRange(slot);
+                      const disabled = passed || overlapsBooked;
+                      const selected = time === slot && !disabled;
                       const endAt =
-                        !passed && totalSelectedDurationMinutes > 0
+                        !disabled && totalSelectedDurationMinutes > 0
                           ? slotEndTimeHHmm(slot, totalSelectedDurationMinutes)
                           : "";
                       const slotTitle = passed
                         ? "This time has already passed"
+                        : overlapsBooked
+                          ? "This time overlaps an existing booking"
                         : endAt
-                          ? `${slot} start — ends ${endAt}`
+                          ? `${formatSlotAmPm(slot)} start — ends ${formatSlotAmPm(endAt)}`
                           : undefined;
                       return (
                         <button
@@ -410,23 +453,23 @@ export default function BookingDayTimeStep({
                           type="button"
                           role="option"
                           aria-selected={selected}
-                          disabled={passed}
+                          disabled={disabled}
                           title={slotTitle}
                           onClick={() => {
-                            if (!passed) onTimeChange(slot);
+                            if (!disabled) onTimeChange(slot);
                           }}
                           className={`group flex min-h-[3.35rem] flex-col items-center justify-center gap-0.5 rounded-xl border px-1.5 py-2 text-center text-sm font-semibold tabular-nums transition-all duration-200 active:scale-[0.97] ${
-                            passed
+                            disabled
                               ? "cursor-not-allowed border-gray-200 bg-gray-100 text-gray-400 opacity-60"
                               : selected
                                 ? "border-amber-500 bg-gradient-to-b from-amber-50 to-amber-100/80 text-amber-950 shadow-md shadow-amber-500/15 ring-2 ring-amber-400/30"
                                 : "border-gray-200/90 bg-white text-charcoal shadow-sm hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md"
                           }`}
                         >
-                          <span className="tabular-nums tracking-tight">{slot}</span>
+                          <span className="tabular-nums tracking-tight">{formatSlotAmPm(slot)}</span>
                           {endAt ? (
                             <span className="text-[10px] font-medium leading-tight text-gray-500 group-hover:text-amber-700/80 sm:text-[11px]">
-                              ends {endAt}
+                              ends {formatSlotAmPm(endAt)}
                             </span>
                           ) : null}
                         </button>
@@ -445,7 +488,7 @@ export default function BookingDayTimeStep({
               </div>
             </div>
 
-            <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-gradient-to-b from-gray-50 to-white shadow-[0_16px_40px_-20px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.04]">
+            <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-gradient-to-b from-gray-50 to-white shadow-[0_16px_40px_-20px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.04] lg:h-[70vh] lg:max-h-[70vh]">
               <div className="shrink-0 border-b border-gray-100/80 bg-white/60 px-4 py-3.5 backdrop-blur-sm sm:px-5">
                 <p className="font-display text-base font-semibold text-charcoal">Your booking</p>
                 <p className="mt-1 text-xs leading-relaxed text-gray-500">

@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useLoginModal } from "@/context/LoginModalContext";
 
 // Unsplash - verified salon/beauty photos (woman at salon, hair styling, salon interior)
 const heroImages = [
@@ -13,7 +12,6 @@ const heroImages = [
 ];
 
 export default function Hero() {
-  const { handleBookNow } = useLoginModal();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
@@ -66,15 +64,14 @@ export default function Hero() {
           Where elegance meets expertise. Experience transformative beauty in a sanctuary designed exclusively for women.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <button
-            type="button"
-            onClick={() => handleBookNow()}
+          <Link
+            href="/services"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-amber-500 text-white font-medium tracking-wide hover:bg-amber-600 transition-all duration-300 shadow-lg hover:shadow-amber-500/30"
           >
             Book Appointment
-          </button>
+          </Link>
           <Link
-            href="#services"
+            href="/services"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 border-2 border-white/80 text-white font-medium tracking-wide hover:bg-white/10 transition-all duration-300"
           >
             Our Services

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatBookingLineMeta, type BookingServiceCategory } from "@/services/api";
-import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 
 function formatAud(price: number): string {
   if (price <= 0) return "";
@@ -38,27 +37,6 @@ export default function BookingServicePicker({
     });
   }, [categories]);
 
-  const selectedLines = useMemo(() => {
-    const byId = new Map<
-      string,
-      { id: string; name: string; price: number; heading: string; durationLabel: string }
-    >();
-    for (const cat of categories) {
-      for (const line of cat.lines) {
-        if (selectedSet.has(line.id)) {
-          byId.set(line.id, {
-            id: line.id,
-            name: line.name,
-            price: line.price,
-            heading: cat.heading,
-            durationLabel: (line.durationLabel ?? "").trim(),
-          });
-        }
-      }
-    }
-    return selectedIds.map((id) => byId.get(id)).filter((row): row is NonNullable<typeof row> => row != null);
-  }, [categories, selectedSet, selectedIds]);
-
   if (loading) {
     return (
       <div className="flex min-h-[12rem] items-center justify-center rounded-2xl border border-gray-200/80 bg-white px-6 py-12 text-center text-sm text-gray-500 shadow-sm">
@@ -76,10 +54,9 @@ export default function BookingServicePicker({
   }
 
   return (
-    <div className="mx-auto flex h-full min-h-0 w-full max-w-lg flex-col sm:max-w-2xl lg:max-w-3xl">
-      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border border-gray-200/80 bg-white shadow-[0_4px_18px_-8px_rgba(0,0,0,0.1)]">
-        <div className="grid min-h-0 flex-1 grid-cols-1 md:grid-cols-[minmax(0,1fr)_260px]">
-          <div className="min-h-0 overflow-y-auto overscroll-y-contain p-2.5 [-webkit-overflow-scrolling:touch] sm:p-3">
+    <div className="mx-auto flex w-full max-w-lg flex-col sm:max-w-2xl lg:max-w-3xl">
+      <div className="flex flex-col rounded-2xl border border-gray-200/80 bg-white shadow-[0_4px_18px_-8px_rgba(0,0,0,0.1)] md:h-full md:min-h-0 md:flex-1 md:overflow-hidden">
+        <div className="p-2.5 sm:p-3 md:min-h-0 md:flex-1">
             <div className="space-y-2.5">
               {categories.map((cat) => {
                 const count = cat.lines.filter((l) => selectedSet.has(l.id)).length;
@@ -180,58 +157,6 @@ export default function BookingServicePicker({
                 );
               })}
             </div>
-          </div>
-
-          <aside className="flex min-h-0 flex-col border-t border-gray-100 bg-gray-50/55 p-3.5 md:border-l md:border-t-0">
-            <p className="text-[13px] leading-relaxed text-gray-700">
-              Choose the service you&apos;d like to book. Browse available options and pick what suits you best.
-            </p>
-
-            <div className="mt-3.5 rounded-xl border border-gray-200/90 bg-white px-3 py-3 shadow-sm">
-              <div className="flex items-start gap-2.5">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-gray-100 text-amber-500" aria-hidden>
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.75}
-                      d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                    />
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.75}
-                      d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                    />
-                  </svg>
-                </span>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
-                  <p className="mt-1 text-xs leading-relaxed text-gray-600">{SALON_BOOKING_ADDRESS}</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-3.5 min-h-0 flex-1 rounded-xl border border-amber-100/50 bg-white/90 p-3 shadow-inner">
-              {selectedLines.length === 0 ? (
-                <p className="text-sm text-gray-500">No services selected yet.</p>
-              ) : (
-                <ul className="max-h-full space-y-2 overflow-y-auto pr-1 [-webkit-overflow-scrolling:touch]">
-                  {selectedLines.map((row) => (
-                    <li key={row.id} className="rounded-lg border border-gray-100 bg-gray-50/60 px-2.5 py-2">
-                      <p className="text-[11px] font-semibold leading-snug text-amber-600/90 line-clamp-1">
-                        {row.heading}
-                      </p>
-                      <p className="mt-0.5 text-sm font-semibold leading-snug text-charcoal line-clamp-1">{row.name}</p>
-                      {row.durationLabel ? (
-                        <p className="mt-1 text-xs leading-snug text-gray-600 line-clamp-1">{row.durationLabel}</p>
-                      ) : null}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </aside>
         </div>
       </div>
     </div>

@@ -14,6 +14,8 @@ import {
 import {
   bookAppointment,
   getSalonAvailability,
+  getAppointmentsBookedSlots,
+  type BookedSlot,
   type BookAppointmentBody,
   type SalonAvailability,
 } from "@/lib/api";
@@ -22,6 +24,7 @@ import {
   isSlotTimePassedForSelectedDate,
   localDateYmd,
   slotEndTimeHHmm,
+  parseHHMM,
 } from "@/lib/availabilitySlots";
 import { useLoginModal } from "@/context/LoginModalContext";
 import {
@@ -59,6 +62,7 @@ export default function AppointmentBookingPage() {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [availability, setAvailability] = useState<SalonAvailability | null>(null);
+  const [bookedSlots, setBookedSlots] = useState<BookedSlot[]>([]);
   const [availabilityLoading, setAvailabilityLoading] = useState(true);
   const [availabilityError, setAvailabilityError] = useState("");
   /** Bumps every second on the client so past-slot disabled state stays in sync with the clock. */
@@ -79,21 +83,6 @@ export default function AppointmentBookingPage() {
   useEffect(() => {
     setCountrySelect((prev) => (prev.startsWith("+61__") ? prev : getDefaultCountrySelectValue()));
   }, []);
-
-  useEffect(() => {
-    if (typeof document === "undefined") return;
-    if (step !== "services") return;
-    const html = document.documentElement;
-    const body = document.body;
-    const prevHtmlOverflow = html.style.overflow;
-    const prevBodyOverflow = body.style.overflow;
-    html.style.overflow = "hidden";
-    body.style.overflow = "hidden";
-    return () => {
-      html.style.overflow = prevHtmlOverflow;
-      body.style.overflow = prevBodyOverflow;
-    };
-  }, [step]);
 
   useEffect(() => {
     getServicesForBooking()
@@ -198,17 +187,33 @@ export default function AppointmentBookingPage() {
       .finally(() => setAvailabilityLoading(false));
   }, []);
 
+  const maxBookAheadYmd = useMemo(() => {
+    const d = new Date();
+    d.setMonth(d.getMonth() + 4);
+    return localDateYmd(d);
+  }, []);
+
+  useEffect(() => {
+    getAppointmentsBookedSlots({ fromDate: localDateYmd(new Date()), toDate: maxBookAheadYmd })
+      .then(setBookedSlots)
+      .catch(() => setBookedSlots([]));
+  }, [maxBookAheadYmd]);
+
   /** API `availableFrom` / `availableTo` → 15-minute starts inside that range. */
   const baseSlots = useMemo(() => {
     if (!availability?.availableFrom?.trim() || !availability?.availableTo?.trim()) return [];
     return slotsInOpeningWindow(availability.availableFrom, availability.availableTo);
   }, [availability]);
 
-  const maxBookAheadYmd = useMemo(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 4);
-    return localDateYmd(d);
-  }, []);
+  const durationFitSlots = useMemo(() => {
+    const end = parseHHMM(availability?.availableTo ?? "");
+    if (!Number.isFinite(end)) return baseSlots;
+    if (!(totalSelectedDurationMinutes > 0)) return baseSlots;
+    return baseSlots.filter((slot) => {
+      const start = parseHHMM(slot);
+      return Number.isFinite(start) && start + totalSelectedDurationMinutes <= end;
+    });
+  }, [baseSlots, availability?.availableTo, totalSelectedDurationMinutes]);
 
   useEffect(() => {
     if (!time || !date) return;
@@ -253,38 +258,43 @@ export default function AppointmentBookingPage() {
     setSubmitting(true);
     const userNotes = notes.trim();
 
-    let body: BookAppointmentBody = {
+    const groupedServices = new Map<
+      string,
+      { serviceId: string; serviceName: string; subServices: { name: string; price: number }[] }
+    >();
+    for (const row of summaryLines) {
+      const key = row.parentServiceId || row.bookingServiceId;
+      const existing = groupedServices.get(key);
+      if (existing) {
+        existing.subServices.push({ name: row.name, price: row.price });
+      } else {
+        groupedServices.set(key, {
+          serviceId: row.parentServiceId || row.bookingServiceId,
+          serviceName: row.heading?.trim() || "Service",
+          subServices: [{ name: row.name, price: row.price }],
+        });
+      }
+    }
+
+    const primary = summaryLines[0];
+    const body: BookAppointmentBody = {
       name: trimmedName,
       email: trimmedEmail,
       mobile: digits,
       countryCode,
       date,
       time,
+      estimatedTime: totalSelectedDurationMinutes > 0 ? totalSelectedDurationMinutes : undefined,
       notes: userNotes,
-    };
-
-    if (summaryLines.length === 1) {
-      const r = summaryLines[0];
-      body = {
-        ...body,
-        service: r.parentServiceId,
+      service: primary?.parentServiceId || primary?.bookingServiceId,
+      serviceId: primary?.bookingServiceId || primary?.parentServiceId,
+      serviceSelections: summaryLines.map((r) => ({
         serviceId: r.bookingServiceId,
         subheading: r.subheading,
         serviceItemName: r.name,
-      };
-    } else {
-      const primary = summaryLines[0];
-      body = {
-        ...body,
-        service: primary.parentServiceId,
-        serviceId: primary.parentServiceId,
-        serviceSelections: summaryLines.map((r) => ({
-          serviceId: r.bookingServiceId,
-          subheading: r.subheading,
-          serviceItemName: r.name,
-        })),
-      };
-    }
+      })),
+      services: Array.from(groupedServices.values()),
+    };
 
     try {
       await bookAppointment(body, token);
@@ -333,65 +343,124 @@ export default function AppointmentBookingPage() {
   }
 
   return (
-    <main
-      className={`bg-[#f4f4f5] flex flex-col ${
-        step === "services" ? "min-h-screen lg:h-dvh lg:overflow-hidden" : "min-h-screen"
-      }`}
-    >
+    <main className="bg-[#f4f4f5] flex min-h-screen flex-col">
       <Header />
-      <section
-        className={
-          step === "services"
-            ? "flex-1 pt-28 pb-3 md:pb-4 lg:min-h-0 lg:overflow-hidden"
-            : "pt-28 pb-16 md:pb-24"
-        }
-      >
-        <div
-          className={
-            step === "services"
-              ? "mx-auto flex w-full max-w-6xl flex-col px-4 sm:px-6 lg:h-full lg:min-h-0"
-              : "max-w-6xl mx-auto px-4 sm:px-6"
-          }
-        >
+      <section className={step === "services" ? "pt-28 pb-3 md:pb-4" : "pt-28 pb-16 md:pb-24"}>
+        <div className={step === "services" ? "mx-auto w-full max-w-6xl px-4 sm:px-6" : "max-w-6xl mx-auto px-4 sm:px-6"}>
           {step === "services" ? (
-            <div className="grid min-h-0 flex-1 grid-rows-[auto_minmax(0,1fr)_auto] gap-3">
-              <div className="relative shrink-0 flex flex-col items-center justify-center gap-3 sm:block">
+            <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 7rem)" }}>
+              <div className="relative shrink-0 flex flex-col items-center justify-center gap-2 sm:block">
                 <h1 className="font-display text-xl font-medium text-charcoal text-center px-11 sm:px-0 sm:text-2xl md:text-3xl">
                   Select services
                 </h1>
-                {!token ? (
-                  <button
-                    type="button"
-                    onClick={openLogin}
-                    className="sm:absolute sm:right-0 sm:top-1/2 sm:-translate-y-1/2 rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-charcoal shadow-sm hover:bg-gray-50 transition-colors"
+              </div>
+
+              <div className="grid flex-1 min-h-0 gap-3 lg:grid-cols-[1fr_290px]">
+                <div className="flex flex-col min-h-0 rounded-2xl border border-gray-200/80 bg-white shadow-sm overflow-hidden">
+                  <div className="shrink-0 px-4 py-3 border-b border-gray-100">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-400">
+                      Choose one or more
+                    </p>
+                  </div>
+                  <div
+                    className="flex-1 overflow-y-auto overflow-x-hidden"
+                    style={{
+                      WebkitOverflowScrolling: "touch",
+                      touchAction: "pan-y",
+                      overscrollBehavior: "contain",
+                    }}
                   >
-                    Log in
-                  </button>
-                ) : null}
-              </div>
-
-              <div className="mx-auto flex min-h-0 w-full max-w-lg flex-col gap-3 overflow-hidden sm:max-w-2xl lg:max-w-3xl">
-                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <BookingServicePicker
-                    categories={serviceCategories}
-                    selectedIds={selectedServiceIds}
-                    onToggle={toggleServiceLine}
-                    loading={loading}
-                  />
+                    <BookingServicePicker
+                      categories={serviceCategories}
+                      selectedIds={selectedServiceIds}
+                      onToggle={toggleServiceLine}
+                      loading={loading}
+                    />
+                  </div>
                 </div>
-                {error ? (
-                  <p className="shrink-0 text-sm text-red-600 bg-red-50 px-4 py-3 rounded-lg">{error}</p>
-                ) : null}
-              </div>
 
-              <div className="mx-auto w-full max-w-lg shrink-0 border-t border-gray-200/80 bg-[#f4f4f5] pt-3 shadow-[0_-8px_28px_-12px_rgba(0,0,0,0.07)] pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:max-w-2xl lg:max-w-3xl">
-                <button
-                  type="button"
-                  onClick={goToDateTime}
-                  className="w-full rounded-xl bg-amber-500 py-3.5 text-[15px] font-semibold text-white shadow-md shadow-amber-500/25 transition-colors hover:bg-amber-600 active:scale-[0.99] sm:py-4 sm:text-base"
-                >
-                  Continue
-                </button>
+                <div className="flex flex-col min-h-0 rounded-2xl border border-amber-100/80 bg-gradient-to-b from-amber-50/80 via-white to-amber-50/30 shadow-sm ring-1 ring-black/[0.03] overflow-hidden">
+                  <div className="shrink-0 px-4 py-3 border-b border-amber-100/60 flex items-center justify-between">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-500/90">Summary</p>
+                    {summaryLines.length > 0 && (
+                      <span className="text-[11px] font-semibold bg-amber-100 text-amber-700 px-2.5 py-0.5 rounded-full">
+                        {summaryLines.length} selected
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className="flex-1 overflow-y-auto overflow-x-hidden"
+                    style={{
+                      WebkitOverflowScrolling: "touch",
+                      touchAction: "pan-y",
+                      overscrollBehavior: "contain",
+                    }}
+                  >
+                    {summaryLines.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center h-full gap-2 px-6 text-center">
+                        <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={1.5}
+                            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
+                          />
+                        </svg>
+                        <p className="text-sm text-gray-400">No services selected yet</p>
+                      </div>
+                    ) : (
+                      <ul className="divide-y divide-gray-100">
+                        {summaryLines.map((row) => {
+                          const priceStr = row.price > 0 ? fmtAudBooking.format(row.price) : "";
+                          const meta = formatBookingLineMeta(row.durationLabel, priceStr);
+                          return (
+                            <li key={row.id} className="px-4 py-3 flex items-start justify-between gap-3">
+                              <div className="flex-1 min-w-0">
+                                <p className="text-[10px] font-bold uppercase tracking-wide text-amber-600/80 truncate">
+                                  {row.heading?.trim() || "Service"}
+                                </p>
+                                <p className="text-sm font-semibold text-charcoal mt-0.5 truncate">{row.name}</p>
+                                {meta && meta !== "—" ? <p className="text-xs text-gray-500 mt-0.5">{meta}</p> : null}
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => toggleServiceLine(row.id)}
+                                className="shrink-0 mt-0.5 text-gray-300 hover:text-red-400 transition-colors"
+                                aria-label={`Remove ${row.name}`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+
+                  <div className="shrink-0 border-t border-amber-100/60 bg-white/80 px-4 py-3 space-y-3">
+                    {summaryLines.length > 0 && (
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-500">
+                          {totalSelectedDurationMinutes > 0 ? `Est. ${totalSelectedDurationMinutes} min` : "Est. total"}
+                        </span>
+                        <span className="font-semibold text-charcoal">
+                          {fmtAudBooking.format(summaryLines.reduce((s, r) => s + r.price, 0))}
+                        </span>
+                      </div>
+                    )}
+                    {error ? <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p> : null}
+                    <button
+                      type="button"
+                      onClick={goToDateTime}
+                      className="w-full rounded-xl bg-amber-500 py-3 text-[15px] font-semibold text-white shadow-md shadow-amber-500/25 transition-colors hover:bg-amber-600 active:scale-[0.99]"
+                    >
+                      Continue
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           ) : null}
@@ -414,13 +483,14 @@ export default function AppointmentBookingPage() {
               onTimeChange={setTime}
               minYmd={localDateYmd(new Date())}
               maxYmd={maxBookAheadYmd}
-              baseSlots={baseSlots}
+              baseSlots={durationFitSlots}
               availabilityLoading={availabilityLoading}
               availabilityError={availabilityError}
               clockTick={clockTick}
               summaryLines={summaryLines}
               totalSelectedDurationMinutes={totalSelectedDurationMinutes}
               stepError={error}
+              bookedSlots={bookedSlots}
             />
           ) : null}
 

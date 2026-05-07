@@ -262,6 +262,12 @@ export type AppointmentServiceSelection = {
   serviceItemName: string;
 };
 
+export type AppointmentGroupedService = {
+  serviceId: string;
+  serviceName: string;
+  subServices: { name: string; price: number }[];
+};
+
 /**
  * POST /appointments body — either one line (`serviceId` + `subheading` + `serviceItemName`)
  * or multiple (`serviceSelections`). Do not send both shapes at once.
@@ -286,6 +292,10 @@ export type BookAppointmentBody = {
   serviceItemName?: string;
   /** Multiple selections. */
   serviceSelections?: AppointmentServiceSelection[];
+  /** Total estimated appointment duration in minutes. */
+  estimatedTime?: number;
+  /** Grouped service payload used by current appointments API. */
+  services?: AppointmentGroupedService[];
 };
 
 export type SalonAvailability = {
@@ -293,6 +303,12 @@ export type SalonAvailability = {
   availableTo: string;
   createdAt?: string;
   updatedAt?: string;
+};
+
+export type BookedSlot = {
+  date: string;
+  start: string;
+  end: string;
 };
 
 export async function getSalonAvailability(): Promise<SalonAvailability> {
@@ -308,6 +324,50 @@ export async function getSalonAvailability(): Promise<SalonAvailability> {
     throw new Error("Invalid availability response");
   }
   return data;
+}
+
+function parseBookedSlotRow(raw: unknown): BookedSlot | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const date = typeof r.date === "string" ? r.date.trim() : "";
+  const start = typeof r.start === "string" ? r.start.trim() : "";
+  const end = typeof r.end === "string" ? r.end.trim() : "";
+  if (!date || !start || !end) return null;
+  return { date, start, end };
+}
+
+export async function getAppointmentsBookedSlots(params?: {
+  fromDate?: string;
+  toDate?: string;
+}): Promise<BookedSlot[]> {
+  const query = new URLSearchParams();
+  if (params?.fromDate) query.set("fromDate", params.fromDate);
+  if (params?.toDate) query.set("toDate", params.toDate);
+  const qs = query.toString();
+  const res = await fetch(`${API_BASE_URL}/api/v1/appointments/booked-slots${qs ? `?${qs}` : ""}`, {
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(
+      typeof (json as { message?: unknown }).message === "string"
+        ? String((json as { message: string }).message)
+        : "Failed to fetch booked slots"
+    );
+  }
+
+  const root = json as Record<string, unknown>;
+  const source =
+    (Array.isArray(root.data) && root.data) ||
+    (root.data &&
+    typeof root.data === "object" &&
+    Array.isArray((root.data as Record<string, unknown>).bookedSlots)
+      ? ((root.data as Record<string, unknown>).bookedSlots as unknown[])
+      : null) ||
+    (Array.isArray(root.bookedSlots) ? (root.bookedSlots as unknown[]) : null) ||
+    (Array.isArray(json) ? (json as unknown[]) : []);
+
+  return source.map(parseBookedSlotRow).filter((x): x is BookedSlot => x != null);
 }
 
 export type AvailableSlotsResponse = {
