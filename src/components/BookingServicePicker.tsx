@@ -54,7 +54,7 @@ export default function BookingServicePicker({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-lg flex-col sm:max-w-2xl lg:max-w-3xl">
+    <div className="flex w-full flex-col">
       <div className="flex flex-col rounded-2xl border border-gray-200/80 bg-white shadow-[0_4px_18px_-8px_rgba(0,0,0,0.1)] md:h-full md:min-h-0 md:flex-1 md:overflow-hidden">
         <div className="p-2.5 sm:p-3 md:min-h-0 md:flex-1">
             <div className="space-y-2.5">

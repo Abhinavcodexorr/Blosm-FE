@@ -245,6 +245,10 @@ export default function AppointmentBookingPage() {
     }
   }, [date, time, baseSlots, clockTick]);
 
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }, [step]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -421,10 +425,10 @@ export default function AppointmentBookingPage() {
   return (
     <main className="bg-[#f4f4f5] flex min-h-screen flex-col">
       <Header />
-      <section className={step === "services" ? "pt-28 pb-3 md:pb-4" : "pt-28 pb-16 md:pb-24"}>
+      <section className={step === "services" ? "pt-28 pb-24 md:pb-28 lg:pb-4" : "pt-28 pb-16 md:pb-24"}>
         <div className={step === "services" ? "mx-auto w-full max-w-6xl px-4 sm:px-6" : "max-w-6xl mx-auto px-4 sm:px-6"}>
           {step === "services" ? (
-            <div className="flex flex-col gap-3" style={{ height: "calc(100vh - 7rem)" }}>
+            <div className="flex flex-col gap-3 min-h-[calc(100dvh-7rem)] lg:h-[calc(100vh-7rem)] lg:min-h-0">
               <div className="relative shrink-0 flex flex-col items-center justify-center gap-2 sm:block">
                 <h1 className="font-display text-xl font-medium text-charcoal text-center px-11 sm:px-0 sm:text-2xl md:text-3xl">
                   Select services
@@ -439,7 +443,7 @@ export default function AppointmentBookingPage() {
                     </p>
                   </div>
                   <div
-                    className="flex-1 overflow-y-auto overflow-x-hidden"
+                    className="overflow-visible pb-6 lg:flex-1 lg:max-h-none lg:overflow-y-auto lg:overflow-x-hidden lg:pb-0 lg:pr-1 lg:[scrollbar-gutter:stable]"
                     style={{
                       WebkitOverflowScrolling: "touch",
                       touchAction: "pan-y",
@@ -455,7 +459,7 @@ export default function AppointmentBookingPage() {
                   </div>
                 </div>
 
-                <div className="flex flex-col min-h-0 rounded-2xl border border-amber-100/80 bg-gradient-to-b from-amber-50/80 via-white to-amber-50/30 shadow-sm ring-1 ring-black/[0.03] overflow-hidden">
+                <div className="flex flex-col min-h-0 rounded-2xl border border-amber-100/80 bg-gradient-to-b from-amber-50/80 via-white to-amber-50/30 shadow-sm ring-1 ring-black/[0.03] overflow-visible lg:overflow-hidden">
                   <div className="shrink-0 px-4 py-3 border-b border-amber-100/60 flex items-center justify-between">
                     <p className="text-[11px] font-semibold uppercase tracking-widest text-amber-500/90">Summary</p>
                     {summaryLines.length > 0 && (
@@ -466,7 +470,7 @@ export default function AppointmentBookingPage() {
                   </div>
 
                   <div
-                    className="flex-1 overflow-y-auto overflow-x-hidden"
+                    className="overflow-visible lg:flex-1 lg:overflow-y-auto lg:overflow-x-hidden"
                     style={{
                       WebkitOverflowScrolling: "touch",
                       touchAction: "pan-y",
@@ -531,11 +535,24 @@ export default function AppointmentBookingPage() {
                     <button
                       type="button"
                       onClick={goToDateTime}
-                      className="w-full rounded-xl bg-amber-500 py-3 text-[15px] font-semibold text-white shadow-md shadow-amber-500/25 transition-colors hover:bg-amber-600 active:scale-[0.99]"
+                      className="hidden lg:block w-full rounded-xl bg-amber-500 py-3 text-[15px] font-semibold text-white shadow-md shadow-amber-500/25 transition-colors hover:bg-amber-600 active:scale-[0.99]"
                     >
                       Continue
                     </button>
                   </div>
+                </div>
+              </div>
+
+              <div className="fixed inset-x-0 bottom-0 z-40 border-t border-amber-100/70 bg-white/95 px-4 py-3 shadow-[0_-8px_24px_-16px_rgba(0,0,0,0.25)] backdrop-blur-sm lg:hidden">
+                <div className="mx-auto w-full max-w-6xl">
+                  {error ? <p className="mb-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p> : null}
+                  <button
+                    type="button"
+                    onClick={goToDateTime}
+                    className="w-full rounded-xl bg-amber-500 py-3 text-[15px] font-semibold text-white shadow-md shadow-amber-500/25 transition-colors hover:bg-amber-600 active:scale-[0.99]"
+                  >
+                    Continue
+                  </button>
                 </div>
               </div>
             </div>
