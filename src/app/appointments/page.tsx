@@ -29,6 +29,24 @@ function statusStyle(status?: string) {
   return "bg-amber-100 text-amber-900";
 }
 
+function groupedServiceSelections(apt: MyAppointment): Array<{ heading: string; items: string[] }> {
+  const raw = apt as unknown as Record<string, unknown>;
+  const out = new Map<string, string[]>();
+  const rows = raw.serviceSelections;
+  if (!Array.isArray(rows)) return [];
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const heading = String(r.serviceName ?? r.subheading ?? "Service").trim() || "Service";
+    const item = String(r.serviceItemName ?? r.name ?? "").trim();
+    if (!item) continue;
+    const list = out.get(heading) ?? [];
+    if (!list.includes(item)) list.push(item);
+    out.set(heading, list);
+  }
+  return Array.from(out.entries()).map(([heading, items]) => ({ heading, items }));
+}
+
 export default function AppointmentsPage() {
   const { token, openLogin } = useLoginModal();
   const [list, setList] = useState<MyAppointment[]>([]);
@@ -96,17 +114,16 @@ export default function AppointmentsPage() {
                 </div>
               ) : (
                 <ul className="space-y-4">
-                  {list.map((apt) => (
+                  {list.map((apt) => {
+                    const grouped = groupedServiceSelections(apt);
+                    return (
                     <li
                       key={apt._id || `${apt.date}-${apt.time}-${apt.serviceId}`}
                       className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
                     >
                       <div className="px-5 py-4 md:px-6 md:py-5 border-b border-gray-50 flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <p className="font-display text-lg font-medium text-charcoal">
-                            {apt.service || "Appointment"}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-gray-600">
                             {formatDate(apt.date)}
                             {apt.time ? ` · ${formatTimeToAmPm(apt.time)}` : ""}
                             {typeof apt.duration === "number" ? ` · ${apt.duration} min` : ""}
@@ -125,7 +142,26 @@ export default function AppointmentsPage() {
                           </span>
                         ) : null}
                       </div>
-                      <div className="px-5 py-3 md:px-6 bg-gray-50/50 text-xs text-gray-600 space-y-1">
+                      <div className="px-5 py-3 md:px-6 bg-gray-50/50 text-xs text-gray-600 space-y-2">
+                        {grouped.length > 0 ? (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Selected Service</p>
+                            <div className="mt-1.5 space-y-2">
+                              {grouped.map((group) => (
+                                <div key={group.heading}>
+                                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600">{group.heading}</p>
+                                  <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                                    {group.items.map((item) => (
+                                      <li key={`${group.heading}-${item}`} className="text-sm text-charcoal">
+                                        {item}
+                                      </li>
+                                    ))}
+                                  </ul>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : null}
                         {apt.name ? (
                           <p>
                             <span className="font-semibold text-gray-500">Name</span> {apt.name}
@@ -152,7 +188,7 @@ export default function AppointmentsPage() {
                         ) : null}
                       </div>
                     </li>
-                  ))}
+                  )})}
                 </ul>
               )}
             </div>

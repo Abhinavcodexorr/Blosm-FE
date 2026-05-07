@@ -40,6 +40,7 @@ import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 import Link from "next/link";
 
 type BookingStep = "services" | "datetime" | "details";
+const AFTER_LOGIN_CONTINUE_KEY = "appointment_continue_after_login";
 
 function formatBookingDateLong(ymd: string): string {
   if (!ymd) return "";
@@ -174,14 +175,8 @@ export default function AppointmentBookingPage() {
     []
   );
 
-  function goToDateTime() {
+  function continueToDateTimeStep() {
     setError("");
-    if (!token) {
-      setRedirectAfterLogin("/appointment");
-      openLogin();
-      setError("Please log in to continue booking.");
-      return;
-    }
     if (selectedServiceIds.length === 0 || !selectedServiceIds[0]) {
       setError("Please select at least one service.");
       return;
@@ -196,6 +191,18 @@ export default function AppointmentBookingPage() {
     setDate(autoDate);
     if (autoDate !== date) setTime("");
     setStep("datetime");
+  }
+
+  function goToDateTime() {
+    if (!token) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(AFTER_LOGIN_CONTINUE_KEY, "1");
+      }
+      setRedirectAfterLogin("/appointment");
+      openLogin();
+      return;
+    }
+    continueToDateTimeStep();
   }
 
   function goToDetails() {
@@ -302,6 +309,13 @@ export default function AppointmentBookingPage() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
   }, [step]);
+
+  useEffect(() => {
+    if (!authReady || !token || typeof window === "undefined") return;
+    if (sessionStorage.getItem(AFTER_LOGIN_CONTINUE_KEY) !== "1") return;
+    sessionStorage.removeItem(AFTER_LOGIN_CONTINUE_KEY);
+    continueToDateTimeStep();
+  }, [authReady, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
