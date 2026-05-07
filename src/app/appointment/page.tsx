@@ -26,6 +26,7 @@ import {
   slotEndTimeHHmm,
   parseHHMM,
 } from "@/lib/availabilitySlots";
+import { formatTimeToAmPm } from "@/lib/timeDisplay";
 import { useLoginModal } from "@/context/LoginModalContext";
 import {
   sanitizeMobileDigits,
@@ -34,6 +35,7 @@ import {
   MOBILE_DIGITS_LEN,
 } from "@/lib/mobileInput";
 import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
+import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 import Link from "next/link";
 
 type BookingStep = "services" | "datetime" | "details";
@@ -51,7 +53,7 @@ function formatBookingDateLong(ymd: string): string {
 }
 
 export default function AppointmentBookingPage() {
-  const { token, openLogin } = useLoginModal();
+  const { token, authReady, openLogin, setRedirectAfterLogin } = useLoginModal();
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
   const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
@@ -83,6 +85,13 @@ export default function AppointmentBookingPage() {
   useEffect(() => {
     setCountrySelect((prev) => (prev.startsWith("+61__") ? prev : getDefaultCountrySelectValue()));
   }, []);
+
+  useEffect(() => {
+    if (!authReady) return;
+    if (token) return;
+    setRedirectAfterLogin("/appointment");
+    openLogin();
+  }, [authReady, token, openLogin, setRedirectAfterLogin]);
 
   useEffect(() => {
     getServicesForBooking()
@@ -151,6 +160,12 @@ export default function AppointmentBookingPage() {
 
   function goToDateTime() {
     setError("");
+    if (!token) {
+      setRedirectAfterLogin("/appointment");
+      openLogin();
+      setError("Please log in to continue booking.");
+      return;
+    }
     if (selectedServiceIds.length === 0 || !selectedServiceIds[0]) {
       setError("Please select at least one service.");
       return;
@@ -161,6 +176,12 @@ export default function AppointmentBookingPage() {
 
   function goToDetails() {
     setError("");
+    if (!token) {
+      setRedirectAfterLogin("/appointment");
+      openLogin();
+      setError("Please log in to continue booking.");
+      return;
+    }
     if (!date) {
       setError("Please choose an appointment date.");
       return;
@@ -227,6 +248,12 @@ export default function AppointmentBookingPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    if (!token) {
+      setRedirectAfterLogin("/appointment");
+      openLogin();
+      setError("Please log in to request an appointment.");
+      return;
+    }
     const trimmedName = name.trim();
     const trimmedEmail = email.trim();
     if (!trimmedName) {
@@ -310,30 +337,79 @@ export default function AppointmentBookingPage() {
   };
 
   if (submitted) {
+    const formattedStart = time ? formatTimeToAmPm(time) : "";
+    const endTime = time && totalSelectedDurationMinutes > 0 ? slotEndTimeHHmm(time, totalSelectedDurationMinutes) : "";
+    const formattedEnd = endTime ? formatTimeToAmPm(endTime) : "";
     return (
       <main className="min-h-screen">
         <Header />
-        <section className="pt-32 pb-20 bg-amber-50/30 min-h-[60vh] flex items-center">
-          <div className="max-w-2xl mx-auto px-6 text-center w-full">
-            <div className="bg-white p-12 rounded-2xl shadow-sm border border-gray-100">
-              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <section className="pt-32 pb-20 bg-amber-50/30 min-h-[70vh] flex items-center">
+          <div className="max-w-4xl mx-auto px-6 w-full">
+            <div className="bg-white p-6 md:p-10 rounded-2xl shadow-sm border border-gray-100">
+              <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <svg className="w-8 h-8 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="font-display text-3xl font-light text-charcoal mb-4">Booking request received</h1>
-              <p className="text-gray-600 mb-8">
-                Thank you, {name.trim() || name}. We&apos;ll contact you shortly at {dialFromSelection(countrySelect)}{" "}
-                {mobile} to confirm your {serviceTitle || "appointment"}
-                {date ? ` on ${date}` : ""}
-                {time ? ` at ${time}` : ""}.
+              <h1 className="font-display text-3xl font-light text-charcoal mb-2 text-center">Booking request received</h1>
+              <p className="text-gray-600 mb-8 text-center">
+                See you soon, {name.trim() || "there"}. We&apos;ll confirm your appointment shortly.
               </p>
-              <Link
-                href="/appointments"
-                className="inline-flex justify-center items-center rounded-full bg-charcoal px-6 py-2.5 text-sm font-semibold text-white hover:bg-charcoal/90 transition-colors"
-              >
-                View my appointments
-              </Link>
+
+              <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Date</p>
+                    <p className="text-sm font-semibold text-charcoal">{date ? formatBookingDateLong(date) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Time</p>
+                    <p className="text-sm font-semibold text-charcoal">
+                      {formattedStart ? `${formattedStart}${formattedEnd ? ` - ${formattedEnd}` : ""}` : "—"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Venue</p>
+                    <p className="text-sm font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
+                    <p className="text-xs text-gray-600">{SALON_BOOKING_ADDRESS}</p>
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Services</p>
+                  {summaryLines.length > 0 ? (
+                    <ul className="space-y-2">
+                      {summaryLines.map((row) => (
+                        <li key={row.id} className="text-sm text-charcoal">
+                          <span className="font-semibold">{row.name}</span>
+                          {row.subheading ? <span className="text-xs text-gray-500"> · {row.subheading}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-sm text-gray-600">{serviceTitle || "Service details saved."}</p>
+                  )}
+                </div>
+              </div>
+
+              <p className="mt-5 text-xs text-gray-500 text-center">
+                Confirmation updates will be sent to {email.trim() || "your email address"}.
+              </p>
+
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
+                <Link
+                  href="/appointments"
+                  className="inline-flex justify-center items-center rounded-full bg-charcoal px-6 py-2.5 text-sm font-semibold text-white hover:bg-charcoal/90 transition-colors"
+                >
+                  My appointments
+                </Link>
+                <Link
+                  href="/services"
+                  className="inline-flex justify-center items-center rounded-full border border-gray-300 bg-white px-6 py-2.5 text-sm font-semibold text-charcoal hover:bg-gray-50 transition-colors"
+                >
+                  Make another booking
+                </Link>
+              </div>
             </div>
           </div>
         </section>
@@ -614,12 +690,12 @@ export default function AppointmentBookingPage() {
                       {time ? (
                         <div className={date ? "border-t border-gray-100 pt-3" : ""}>
                           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Time</p>
-                          <p className="mt-0.5 font-mono text-base font-semibold text-charcoal">{time}</p>
+                          <p className="mt-0.5 font-mono text-base font-semibold text-charcoal">{formatTimeToAmPm(time)}</p>
                           {totalSelectedDurationMinutes > 0 ? (
                             <p className="text-xs text-gray-600">
                               Est. finish{" "}
                               <span className="font-mono font-medium text-charcoal">
-                                {slotEndTimeHHmm(time, totalSelectedDurationMinutes) || "—"}
+                                {formatTimeToAmPm(slotEndTimeHHmm(time, totalSelectedDurationMinutes) || "—")}
                               </span>
                             </p>
                           ) : null}

@@ -422,9 +422,14 @@ export async function submitEnquiry(body: EnquiryBody) {
   return data;
 }
 
-export async function bookAppointment(body: BookAppointmentBody, token?: string | null) {
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
+export async function bookAppointment(body: BookAppointmentBody, token: string) {
+  if (!token?.trim()) {
+    throw new Error("Please log in to book an appointment.");
+  }
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    Authorization: `Bearer ${token}`,
+  };
   const res = await fetch(`${API_BASE_URL}/api/v1/appointments`, {
     method: "POST",
     headers,

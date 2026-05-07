@@ -6,6 +6,7 @@ import type { PublicUser } from "@/lib/api";
 import { AUTH_EXPIRED_EVENT } from "@/lib/api";
 
 type LoginModalContextType = {
+  authReady: boolean;
   isOpen: boolean;
   openLogin: () => void;
   closeLogin: () => void;
@@ -21,9 +22,23 @@ type LoginModalContextType = {
 const LoginModalContext = createContext<LoginModalContextType | null>(null);
 
 const STORAGE_KEY = "blosm_auth";
+const SESSION_STORAGE_KEY = "blosm_auth";
+
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const m = document.cookie.match(new RegExp(`(?:^|; )${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}=([^;]*)`));
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function clearBrowserAuthStorage() {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(STORAGE_KEY);
+  sessionStorage.removeItem(SESSION_STORAGE_KEY);
+}
 
 export function LoginModalProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const [authReady, setAuthReady] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [user, setUser] = useState<PublicUser | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -32,15 +47,26 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem(STORAGE_KEY);
+        const stored =
+          localStorage.getItem(STORAGE_KEY) ||
+          sessionStorage.getItem(SESSION_STORAGE_KEY) ||
+          readCookie(STORAGE_KEY);
         if (stored) {
           const { token: t, user: u } = JSON.parse(stored);
-          setToken(t);
-          setUser(u);
+          if (t && u) {
+            setToken(t);
+            setUser(u);
+          } else {
+            clearBrowserAuthStorage();
+          }
         }
       } catch {
-        localStorage.removeItem(STORAGE_KEY);
+        clearBrowserAuthStorage();
+      } finally {
+        setAuthReady(true);
       }
+    } else {
+      setAuthReady(true);
     }
   }, []);
 
@@ -52,9 +78,11 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
     setUser(u);
     if (typeof window !== "undefined") {
       if (t && u) {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ token: t, user: u }));
+        const payload = JSON.stringify({ token: t, user: u });
+        localStorage.setItem(STORAGE_KEY, payload);
+        sessionStorage.setItem(SESSION_STORAGE_KEY, payload);
       } else {
-        localStorage.removeItem(STORAGE_KEY);
+        clearBrowserAuthStorage();
       }
     }
   }, []);
@@ -95,6 +123,7 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
   return (
     <LoginModalContext.Provider
       value={{
+        authReady,
         isOpen,
         openLogin,
         closeLogin,

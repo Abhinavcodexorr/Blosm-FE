@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { isSlotTimePassedForSelectedDate, parseHHMM, slotEndTimeHHmm, SLOT_STEP_MINUTES } from "@/lib/availabilitySlots";
 import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
+import { formatTimeToAmPm } from "@/lib/timeDisplay";
 import { formatBookingLineMeta } from "@/services/api";
 import type { BookedSlot } from "@/lib/api";
 
@@ -64,16 +65,6 @@ function formatLongHeading(ymd: string): string {
     day: "numeric",
     month: "long",
   });
-}
-
-function formatSlotAmPm(hhmm: string): string {
-  const [hRaw, mRaw] = hhmm.split(":");
-  const h = Number(hRaw);
-  const m = Number(mRaw);
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return hhmm;
-  const period = h >= 12 ? "PM" : "AM";
-  const hour12 = h % 12 === 0 ? 12 : h % 12;
-  return `${hour12}:${String(m).padStart(2, "0")} ${period}`;
 }
 
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
@@ -230,6 +221,11 @@ export default function BookingDayTimeStep({
     return bookedRangesForDate.some((r) => slotStart < r.end && slotEnd > r.start);
   }
 
+  const visibleSlots = useMemo(
+    () => bookableSlots.filter((slot) => !isOverlappingBookedRange(slot)),
+    [bookableSlots, bookedRangesForDate, totalSelectedDurationMinutes, date]
+  );
+
   useEffect(() => {
     if (!date || !time) return;
     const now = new Date();
@@ -371,11 +367,6 @@ export default function BookingDayTimeStep({
                       {formatRowDate(date)}
                     </h2>
                   </div>
-                  {bookableSlots.length > 0 ? (
-                    <span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-medium text-gray-600">
-                      {bookableSlots.length} slots
-                    </span>
-                  ) : null}
                 </div>
               ) : (
                 <h2 className="mb-5 font-display text-lg font-semibold text-charcoal sm:text-xl">Choose your day</h2>
@@ -421,20 +412,19 @@ export default function BookingDayTimeStep({
                       Join our waitlist
                     </Link>
                   </div>
-                ) : bookableSlots.length === 0 ? (
+                ) : visibleSlots.length === 0 ? (
                   <div className="rounded-xl border border-gray-200/80 bg-gray-50/80 px-4 py-5 text-sm leading-relaxed text-gray-600">
                     No start times left today that are far enough in advance. Pick another date or check back
                     tomorrow.
                   </div>
                 ) : (
                   <div className="min-h-0 flex-1" role="listbox" aria-label="Time slots">
-                    <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-4 md:grid-cols-6">
-                      {bookableSlots.map((slot) => {
+                    <div className="grid grid-cols-4 gap-2.5">
+                      {visibleSlots.map((slot) => {
                       void clockTick;
                       const now = new Date();
                       const passed = date ? isSlotTimePassedForSelectedDate(date, slot, now) : false;
-                      const overlapsBooked = isOverlappingBookedRange(slot);
-                      const disabled = passed || overlapsBooked;
+                      const disabled = passed;
                       const selected = time === slot && !disabled;
                       const endAt =
                         !disabled && totalSelectedDurationMinutes > 0
@@ -442,10 +432,8 @@ export default function BookingDayTimeStep({
                           : "";
                       const slotTitle = passed
                         ? "This time has already passed"
-                        : overlapsBooked
-                          ? "This time overlaps an existing booking"
                         : endAt
-                          ? `${formatSlotAmPm(slot)} start — ends ${formatSlotAmPm(endAt)}`
+                          ? `${formatTimeToAmPm(slot)} start — ends ${formatTimeToAmPm(endAt)}`
                           : undefined;
                       return (
                         <button
@@ -466,10 +454,10 @@ export default function BookingDayTimeStep({
                                 : "border-gray-200/90 bg-white text-charcoal shadow-sm hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md"
                           }`}
                         >
-                          <span className="tabular-nums tracking-tight">{formatSlotAmPm(slot)}</span>
+                          <span className="tabular-nums tracking-tight">{formatTimeToAmPm(slot)}</span>
                           {endAt ? (
                             <span className="text-[10px] font-medium leading-tight text-gray-500 group-hover:text-amber-700/80 sm:text-[11px]">
-                              ends {formatSlotAmPm(endAt)}
+                              ends {formatTimeToAmPm(endAt)}
                             </span>
                           ) : null}
                         </button>
@@ -557,13 +545,13 @@ export default function BookingDayTimeStep({
                 {time ? (
                   <div className="rounded-xl border border-gray-100 bg-gradient-to-r from-gray-50/80 to-white px-3 py-2.5 text-xs text-gray-600">
                     <span className="font-semibold text-charcoal">Time </span>
-                    <span className="font-mono text-[13px] text-gray-800">{time}</span>
+                    <span className="font-mono text-[13px] text-gray-800">{formatTimeToAmPm(time)}</span>
                     {totalSelectedDurationMinutes > 0 ? (
                       <>
                         <span className="mx-1.5 text-gray-300">·</span>
                         <span className="text-gray-500">ends</span>{" "}
                         <span className="font-mono text-[13px] text-gray-800">
-                          {slotEndTimeHHmm(time, totalSelectedDurationMinutes) || "—"}
+                          {formatTimeToAmPm(slotEndTimeHHmm(time, totalSelectedDurationMinutes) || "—")}
                         </span>
                       </>
                     ) : null}

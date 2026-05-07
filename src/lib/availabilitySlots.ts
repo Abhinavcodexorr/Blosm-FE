@@ -16,8 +16,8 @@ function formatMinutes(mins: number): string {
 /** Step between offered start times (e.g. 09:00, 09:15, 09:30 …). */
 export const SLOT_STEP_MINUTES = 15;
 
-/** For “today”, a slot is bookable only if it starts after now plus this buffer. */
-export const BOOKING_MIN_LEAD_MINUTES = 15;
+/** Optional lead-time buffer; set to 0 so upcoming slots like 5:30 are still shown at 5:22. */
+export const BOOKING_MIN_LEAD_MINUTES = 0;
 
 /**
  * After the API returns `availableFrom` and `availableTo`, build slot start times every

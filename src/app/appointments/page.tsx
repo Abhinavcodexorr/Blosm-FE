@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getMyBookingsList, type MyAppointment } from "@/lib/api";
 import { formatAud } from "@/lib/formatCurrency";
+import { formatTimeToAmPm } from "@/lib/timeDisplay";
 
 function formatDate(d?: string) {
   if (!d) return "—";
@@ -107,7 +108,7 @@ export default function AppointmentsPage() {
                           </p>
                           <p className="text-sm text-gray-600 mt-1">
                             {formatDate(apt.date)}
-                            {apt.time ? ` · ${apt.time}` : ""}
+                            {apt.time ? ` · ${formatTimeToAmPm(apt.time)}` : ""}
                             {typeof apt.duration === "number" ? ` · ${apt.duration} min` : ""}
                           </p>
                           {formatAud(apt.price) ? (

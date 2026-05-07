@@ -7,6 +7,7 @@ import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile, type WalletHistoryEntry } from "@/lib/api";
 import { formatAud } from "@/lib/formatCurrency";
+import { formatTimeToAmPm } from "@/lib/timeDisplay";
 
 function formatHistoryWhen(iso: string) {
   if (!iso) return "—";
@@ -155,7 +156,7 @@ export default function WalletPage() {
                                     year: "numeric",
                                   })
                                 : null,
-                              entry.appointmentTime ?? null,
+                              entry.appointmentTime ? formatTimeToAmPm(entry.appointmentTime) : null,
                             ]
                               .filter(Boolean)
                               .join(" · ")
