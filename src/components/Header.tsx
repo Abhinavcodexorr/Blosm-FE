@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import BlosmLogo from './BlosmLogo'
 import { useLoginModal } from '@/context/LoginModalContext'
 
@@ -36,8 +35,22 @@ export default function Header() {
   const [profileOpen, setProfileOpen] = useState(false)
   const profileRef = useRef<HTMLLIElement>(null)
   const [scrolled, setScrolled] = useState(false)
-  const pathname = usePathname()
+  const [pathname, setPathname] = useState('/')
   const { openLogin, token, logout } = useLoginModal()
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const syncPath = () => setPathname(window.location.pathname || '/')
+    syncPath()
+    window.addEventListener('popstate', syncPath)
+    return () => window.removeEventListener('popstate', syncPath)
+  }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const nextPath = window.location.pathname || '/'
+    if (nextPath !== pathname) setPathname(nextPath)
+  }, [pathname])
 
   useEffect(() => {
     const handleScroll = () => {

@@ -25,6 +25,7 @@ import {
   localDateYmd,
   slotEndTimeHHmm,
   parseHHMM,
+  SLOT_STEP_MINUTES,
 } from "@/lib/availabilitySlots";
 import { formatTimeToAmPm } from "@/lib/timeDisplay";
 import { useLoginModal } from "@/context/LoginModalContext";
@@ -87,18 +88,33 @@ export default function AppointmentBookingPage() {
   }, []);
 
   useEffect(() => {
-    if (!authReady) return;
-    if (token) return;
-    setRedirectAfterLogin("/appointment");
-    openLogin();
-  }, [authReady, token, openLogin, setRedirectAfterLogin]);
-
-  useEffect(() => {
     getServicesForBooking()
       .then(setServiceCategories)
       .catch(() => setServiceCategories([]))
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (!serviceCategories.length) return;
+    if (selectedServiceIds.length > 0) return;
+    const raw = (sessionStorage.getItem("selectedService") || "").trim();
+    if (!raw) return;
+    const wanted = raw.toLowerCase();
+    let matchedLineId = "";
+    outer: for (const cat of serviceCategories) {
+      for (const line of cat.lines) {
+        const name = (line.name || "").toLowerCase();
+        const heading = (cat.heading || "").toLowerCase();
+        if (name === wanted || name.includes(wanted) || wanted.includes(name) || heading === wanted) {
+          matchedLineId = line.id;
+          break outer;
+        }
+      }
+    }
+    sessionStorage.removeItem("selectedService");
+    if (matchedLineId) setSelectedServiceIds([matchedLineId]);
+  }, [serviceCategories, selectedServiceIds.length]);
 
   const summaryLines = useMemo(() => {
     const rows: {
@@ -170,7 +186,15 @@ export default function AppointmentBookingPage() {
       setError("Please select at least one service.");
       return;
     }
-    if (!date) setDate(localDateYmd(new Date()));
+    const todayYmd = localDateYmd(new Date());
+    const startYmd = date && date >= todayYmd ? date : todayYmd;
+    const autoDate = nextBookableDate(startYmd);
+    if (!autoDate) {
+      setError("No available time slots found for the selected services in the upcoming booking window.");
+      return;
+    }
+    setDate(autoDate);
+    if (autoDate !== date) setTime("");
     setStep("datetime");
   }
 
@@ -213,6 +237,36 @@ export default function AppointmentBookingPage() {
     d.setMonth(d.getMonth() + 4);
     return localDateYmd(d);
   }, []);
+
+  function hasBookableSlotOnDate(targetYmd: string): boolean {
+    const slotDuration = totalSelectedDurationMinutes > 0 ? totalSelectedDurationMinutes : SLOT_STEP_MINUTES;
+    const ranges = bookedSlots
+      .filter((b) => b.date === targetYmd)
+      .map((b) => ({ start: parseHHMM(b.start), end: parseHHMM(b.end) }))
+      .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start);
+    const now = new Date();
+    return durationFitSlots.some((slot) => {
+      if (isSlotTimePassedForSelectedDate(targetYmd, slot, now)) return false;
+      const start = parseHHMM(slot);
+      if (!Number.isFinite(start)) return false;
+      const end = start + slotDuration;
+      const overlapsBooked = ranges.some((r) => start < r.end && end > r.start);
+      return !overlapsBooked;
+    });
+  }
+
+  function nextBookableDate(startYmd: string): string {
+    if (!startYmd) return "";
+    if (hasBookableSlotOnDate(startYmd)) return startYmd;
+    const d = new Date(startYmd);
+    if (Number.isNaN(d.getTime())) return "";
+    while (true) {
+      d.setDate(d.getDate() + 1);
+      const ymd = localDateYmd(d);
+      if (ymd > maxBookAheadYmd) return "";
+      if (hasBookableSlotOnDate(ymd)) return ymd;
+    }
+  }
 
   useEffect(() => {
     getAppointmentsBookedSlots({ fromDate: localDateYmd(new Date()), toDate: maxBookAheadYmd })
@@ -344,6 +398,15 @@ export default function AppointmentBookingPage() {
     const formattedStart = time ? formatTimeToAmPm(time) : "";
     const endTime = time && totalSelectedDurationMinutes > 0 ? slotEndTimeHHmm(time, totalSelectedDurationMinutes) : "";
     const formattedEnd = endTime ? formatTimeToAmPm(endTime) : "";
+    const groupedBookedServices = Array.from(
+      summaryLines.reduce((acc, row) => {
+        const heading = (row.heading || "Service").trim() || "Service";
+        const list = acc.get(heading) ?? [];
+        list.push(row.name);
+        acc.set(heading, list);
+        return acc;
+      }, new Map<string, string[]>())
+    );
     return (
       <main className="min-h-screen">
         <Header />
@@ -355,12 +418,37 @@ export default function AppointmentBookingPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="font-display text-3xl font-light text-charcoal mb-2 text-center">Booking request received</h1>
+              <h1 className="font-display text-3xl font-semibold text-charcoal mb-1 text-center">
+                See you soon, {name.trim() || "there"}!
+              </h1>
+              <p className="text-charcoal/80 font-semibold mb-1 text-center">Thanks for booking with us.</p>
               <p className="text-gray-600 mb-8 text-center">
-                See you soon, {name.trim() || "there"}. We&apos;ll confirm your appointment shortly.
+                We&apos;ve sent an email confirmation to your provided email address.
               </p>
 
               <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Selected Service</p>
+                  {groupedBookedServices.length > 0 ? (
+                    <div className="space-y-3">
+                      {groupedBookedServices.map(([heading, items]) => (
+                        <div key={heading}>
+                          <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">{heading}</p>
+                          <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                            {items.map((item, idx) => (
+                              <li key={`${heading}-${item}-${idx}`} className="text-sm text-charcoal">
+                                {item}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-600">{serviceTitle || "Service details saved."}</p>
+                  )}
+                </div>
+
                 <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
                   <div>
                     <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Date</p>
@@ -377,28 +465,12 @@ export default function AppointmentBookingPage() {
                     <p className="text-sm font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
                     <p className="text-xs text-gray-600">{SALON_BOOKING_ADDRESS}</p>
                   </div>
-                </div>
-
-                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400 mb-2">Services</p>
-                  {summaryLines.length > 0 ? (
-                    <ul className="space-y-2">
-                      {summaryLines.map((row) => (
-                        <li key={row.id} className="text-sm text-charcoal">
-                          <span className="font-semibold">{row.name}</span>
-                          {row.subheading ? <span className="text-xs text-gray-500"> · {row.subheading}</span> : null}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <p className="text-sm text-gray-600">{serviceTitle || "Service details saved."}</p>
-                  )}
+                  <p className="text-sm text-charcoal/90 font-semibold leading-relaxed">
+                    Your appointment is confirmed! A confirmation has been sent to your contact details.
+                    We look forward to seeing you.
+                  </p>
                 </div>
               </div>
-
-              <p className="mt-5 text-xs text-gray-500 text-center">
-                Confirmation updates will be sent to {email.trim() || "your email address"}.
-              </p>
 
               <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
                 <Link

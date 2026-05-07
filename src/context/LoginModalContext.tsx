@@ -23,6 +23,7 @@ const LoginModalContext = createContext<LoginModalContextType | null>(null);
 
 const STORAGE_KEY = "blosm_auth";
 const SESSION_STORAGE_KEY = "blosm_auth";
+const REDIRECT_KEY = "blosm_redirect_after_login";
 
 function readCookie(name: string): string | null {
   if (typeof document === "undefined") return null;
@@ -44,6 +45,16 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [redirectAfterLogin, setRedirectAfterLogin] = useState<string | null>(null);
 
+  const setRedirectAfterLoginSafe = useCallback((path: string | null) => {
+    setRedirectAfterLogin(path);
+    if (typeof window === "undefined") return;
+    if (path && path.trim()) {
+      sessionStorage.setItem(REDIRECT_KEY, path);
+    } else {
+      sessionStorage.removeItem(REDIRECT_KEY);
+    }
+  }, []);
+
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
@@ -59,6 +70,10 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
           } else {
             clearBrowserAuthStorage();
           }
+        }
+        const storedRedirect = sessionStorage.getItem(REDIRECT_KEY);
+        if (storedRedirect && storedRedirect.trim()) {
+          setRedirectAfterLogin(storedRedirect);
         }
       } catch {
         clearBrowserAuthStorage();
@@ -89,35 +104,30 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setAuth(null, null);
-    setRedirectAfterLogin(null);
+    setRedirectAfterLoginSafe(null);
     setIsOpen(true);
-  }, [setAuth]);
+  }, [setAuth, setRedirectAfterLoginSafe]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
     const onAuthExpired = () => {
       setAuth(null, null);
-      setRedirectAfterLogin(null);
+      setRedirectAfterLoginSafe(null);
       setIsOpen(true);
       router.push("/");
     };
     window.addEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
-  }, [router, setAuth]);
+  }, [router, setAuth, setRedirectAfterLoginSafe]);
 
   const handleBookNow = useCallback(
     (serviceName?: string) => {
       if (typeof window !== "undefined" && serviceName) {
         sessionStorage.setItem("selectedService", serviceName);
       }
-      if (token) {
-        router.push("/appointment");
-      } else {
-        setRedirectAfterLogin("/appointment");
-        setIsOpen(true);
-      }
+      router.push("/appointment");
     },
-    [token, router]
+    [router]
   );
 
   return (
@@ -132,7 +142,7 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
         logout,
         setAuth,
         redirectAfterLogin,
-        setRedirectAfterLogin,
+        setRedirectAfterLogin: setRedirectAfterLoginSafe,
         handleBookNow,
       }}
     >

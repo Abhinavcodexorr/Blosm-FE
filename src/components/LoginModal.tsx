@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile, redeemInviteCode, sendOtp, verifyOtp } from "@/lib/api";
 import PhoneCountryField from "@/components/PhoneCountryField";
@@ -13,11 +13,11 @@ import {
   MOBILE_DIGITS_LEN,
 } from "@/lib/mobileInput";
 import { ENQUIRY_THANKS_PENDING_LOGIN_KEY } from "@/lib/enquiryLoginRedirect";
+const REDIRECT_KEY = "blosm_redirect_after_login";
 
 export default function LoginModal() {
   const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
   const router = useRouter();
-  const pathname = usePathname();
   const [mobile, setMobile] = useState("");
   const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [otp, setOtp] = useState("");
@@ -88,15 +88,18 @@ export default function LoginModal() {
     setError("");
   };
 
-  const handleSuccessClose = () => {
-    if (redirectAfterLogin) {
-      const target = redirectAfterLogin;
+  const navigateAfterLoginSuccess = () => {
+    const fallbackTarget =
+      typeof window !== "undefined" ? sessionStorage.getItem(REDIRECT_KEY) : null;
+    const target = redirectAfterLogin || fallbackTarget;
+    const currentPath = typeof window !== "undefined" ? window.location.pathname : "";
+    if (target) {
       setRedirectAfterLogin(null);
       handleClose(false);
       router.push(target, { scroll: true });
       return;
     } else if (
-      pathname === "/contact" &&
+      currentPath === "/contact" &&
       typeof window !== "undefined" &&
       sessionStorage.getItem(ENQUIRY_THANKS_PENDING_LOGIN_KEY) === "1"
     ) {
@@ -106,6 +109,10 @@ export default function LoginModal() {
       return;
     }
     handleClose();
+  };
+
+  const handleSuccessClose = () => {
+    navigateAfterLoginSuccess();
   };
 
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -171,9 +178,7 @@ export default function LoginModal() {
     } catch {
       // Keep verify-otp user payload if profile refresh fails.
     }
-    setRedirectAfterLogin(null);
-    handleClose(false);
-    router.push("/", { scroll: true });
+    navigateAfterLoginSuccess();
   };
 
   const handleSkipInvite = async () => {
