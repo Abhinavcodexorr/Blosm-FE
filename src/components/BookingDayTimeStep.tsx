@@ -3,7 +3,6 @@
 import { useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { isSlotTimePassedForSelectedDate, parseHHMM, slotEndTimeHHmm, SLOT_STEP_MINUTES } from "@/lib/availabilitySlots";
-import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 import { formatTimeToAmPm } from "@/lib/timeDisplay";
 import { formatBookingLineMeta } from "@/services/api";
 import type { BookedSlot } from "@/lib/api";
@@ -55,18 +54,6 @@ function formatTotalTreatmentMinutes(m: number): string {
   return `${h} hr ${r} min`;
 }
 
-function formatLongHeading(ymd: string): string {
-  if (!ymd) return "";
-  const [y, mo, d] = ymd.split("-").map(Number);
-  if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return "";
-  const dt = new Date(y, mo - 1, d);
-  return dt.toLocaleDateString("en-AU", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
-}
-
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export type BookingSummaryLine = {
@@ -81,8 +68,6 @@ export type BookingSummaryLine = {
 };
 
 type Props = {
-  token: string | null;
-  openLogin: () => void;
   onBack: () => void;
   onContinue: () => void;
   date: string;
@@ -105,8 +90,6 @@ type Props = {
 };
 
 export default function BookingDayTimeStep({
-  token,
-  openLogin,
   onBack,
   onContinue,
   date,
@@ -262,15 +245,6 @@ export default function BookingDayTimeStep({
               Day &amp; time
             </h1>
           </div>
-          {!token ? (
-            <button
-              type="button"
-              onClick={openLogin}
-              className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border border-gray-200 bg-white/95 px-4 py-2 text-sm font-semibold text-charcoal shadow-md shadow-gray-200/30 backdrop-blur-sm transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-800 active:scale-[0.98]"
-            >
-              Log in
-            </button>
-          ) : null}
         </div>
 
         <div className="lg:min-h-0 lg:overflow-hidden">
@@ -477,27 +451,8 @@ export default function BookingDayTimeStep({
             </div>
 
             <aside className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-gray-200/70 bg-gradient-to-b from-gray-50 to-white shadow-[0_16px_40px_-20px_rgba(0,0,0,0.1)] ring-1 ring-black/[0.04] lg:h-[70vh] lg:max-h-[70vh]">
-              <div className="shrink-0 border-b border-gray-100/80 bg-white/60 px-4 py-3.5 backdrop-blur-sm sm:px-5">
-                <p className="font-display text-base font-semibold text-charcoal">Your booking</p>
-                <p className="mt-1 text-xs leading-relaxed text-gray-500">
-                  Services, date, and time appear here as you choose them.
-                </p>
-              </div>
               <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 pr-3 [scrollbar-gutter:stable] [-webkit-overflow-scrolling:touch] sm:p-5 sm:pr-4">
-                <div className="flex items-start gap-3 text-charcoal">
-                  <span
-                    className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-600"
-                    aria-hidden
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.75}
-                        d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"
-                      />
-                    </svg>
-                  </span>
+                <div className="text-charcoal">
                   <div className="min-w-0 flex-1 text-sm">
                     {summaryLines.length === 0 ? (
                       <p className="rounded-lg border border-dashed border-gray-200 bg-gray-50/80 px-3 py-4 text-center text-xs text-gray-500">
@@ -536,12 +491,6 @@ export default function BookingDayTimeStep({
                     ) : null}
                   </div>
                 </div>
-                {date ? (
-                  <div className="rounded-xl border border-gray-100 bg-gradient-to-r from-gray-50/80 to-white px-3 py-2.5 text-xs text-gray-600">
-                    <span className="font-semibold text-charcoal">Date </span>
-                    <span className="text-gray-700">{formatLongHeading(date)}</span>
-                  </div>
-                ) : null}
                 {time ? (
                   <div className="rounded-xl border border-gray-100 bg-gradient-to-r from-gray-50/80 to-white px-3 py-2.5 text-xs text-gray-600">
                     <span className="font-semibold text-charcoal">Time </span>
@@ -557,30 +506,6 @@ export default function BookingDayTimeStep({
                     ) : null}
                   </div>
                 ) : null}
-                <div className="rounded-xl border border-amber-100/60 bg-gradient-to-br from-amber-50/40 via-white to-amber-50/30 p-3.5 shadow-inner">
-                  <div className="flex items-start gap-2.5 text-sm text-gray-700">
-                    <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-amber-500 shadow-sm" aria-hidden>
-                      <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.75}
-                          d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                        />
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={1.75}
-                          d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                        />
-                      </svg>
-                    </span>
-                    <div className="min-w-0">
-                      <p className="font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
-                      <p className="mt-0.5 text-xs leading-relaxed text-gray-600">{SALON_BOOKING_ADDRESS}</p>
-                    </div>
-                  </div>
-                </div>
               </div>
             </aside>
           </div>

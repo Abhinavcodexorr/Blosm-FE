@@ -21,14 +21,6 @@ function formatDate(d?: string) {
   });
 }
 
-function statusStyle(status?: string) {
-  const s = (status || "").toLowerCase();
-  if (s === "confirmed") return "bg-green-100 text-green-800";
-  if (s === "completed") return "bg-stone-100 text-stone-700";
-  if (s === "cancelled" || s === "canceled") return "bg-rose-100 text-rose-800";
-  return "bg-amber-100 text-amber-900";
-}
-
 function groupedServiceSelections(apt: MyAppointment): Array<{ heading: string; items: string[] }> {
   const raw = apt as unknown as Record<string, unknown>;
   const out = new Map<string, string[]>();
@@ -113,44 +105,37 @@ export default function AppointmentsPage() {
                   </Link>
                 </div>
               ) : (
-                <ul className="space-y-4">
+                <ul className="space-y-5">
                   {list.map((apt) => {
                     const grouped = groupedServiceSelections(apt);
                     return (
                     <li
                       key={apt._id || `${apt.date}-${apt.time}-${apt.serviceId}`}
-                      className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden"
+                      className="overflow-hidden rounded-2xl border border-amber-100/70 bg-gradient-to-b from-white via-white to-amber-50/20 shadow-[0_14px_38px_-24px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.02]"
                     >
-                      <div className="px-5 py-4 md:px-6 md:py-5 border-b border-gray-50 flex flex-wrap items-start justify-between gap-3">
+                      <div className="border-b border-amber-100/60 px-5 py-4 md:px-6 md:py-5">
                         <div>
-                          <p className="text-sm text-gray-600">
+                          <p className="text-sm font-medium text-charcoal/80">
                             {formatDate(apt.date)}
                             {apt.time ? ` · ${formatTimeToAmPm(apt.time)}` : ""}
                             {typeof apt.duration === "number" ? ` · ${apt.duration} min` : ""}
                           </p>
                           {formatAud(apt.price) ? (
-                            <p className="text-sm font-semibold text-[#8B6914] mt-2 tabular-nums">
+                            <p className="mt-2 text-sm font-semibold tabular-nums text-[#8B6914]">
                               {formatAud(apt.price)}
                             </p>
                           ) : null}
                         </div>
-                        {apt.status ? (
-                          <span
-                            className={`text-xs font-semibold px-2.5 py-1 rounded-full capitalize shrink-0 ${statusStyle(apt.status)}`}
-                          >
-                            {apt.status}
-                          </span>
-                        ) : null}
                       </div>
-                      <div className="px-5 py-3 md:px-6 bg-gray-50/50 text-xs text-gray-600 space-y-2">
+                      <div className="space-y-3 bg-white/70 px-5 py-4 text-xs text-gray-600 md:px-6">
                         {grouped.length > 0 ? (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">Selected Service</p>
-                            <div className="mt-1.5 space-y-2">
+                          <div className="rounded-xl border border-amber-100/70 bg-amber-50/40 p-3">
+                            <p className="text-sm font-bold uppercase tracking-wide text-black">Selected Services</p>
+                            <div className="mt-2 space-y-2.5">
                               {grouped.map((group) => (
                                 <div key={group.heading}>
-                                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600">{group.heading}</p>
-                                  <ul className="mt-1 list-disc pl-5 space-y-0.5">
+                                  <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700/80">{group.heading}</p>
+                                  <ul className="mt-1 list-disc pl-5 space-y-1">
                                     {group.items.map((item) => (
                                       <li key={`${group.heading}-${item}`} className="text-sm text-charcoal">
                                         {item}
@@ -162,30 +147,32 @@ export default function AppointmentsPage() {
                             </div>
                           </div>
                         ) : null}
-                        {apt.name ? (
-                          <p>
-                            <span className="font-semibold text-gray-500">Name</span> {apt.name}
-                          </p>
-                        ) : null}
-                        {apt.mobile ? (
-                          <p>
-                            <span className="font-semibold text-gray-500">Mobile</span>{" "}
-                            <span className="tabular-nums">
-                              {apt.countryCode ? `${apt.countryCode} ` : ""}
-                              {apt.mobile}
-                            </span>
-                          </p>
-                        ) : null}
-                        {apt.email ? (
-                          <p className="break-all">
-                            <span className="font-semibold text-gray-500">Email</span> {apt.email}
-                          </p>
-                        ) : null}
-                        {apt.notes ? (
-                          <p>
-                            <span className="font-semibold text-gray-500">Notes</span> {apt.notes}
-                          </p>
-                        ) : null}
+                        <div className="space-y-2 rounded-xl border border-gray-100 bg-gray-50/60 p-3">
+                          {apt.name ? (
+                            <p>
+                              <span className="font-semibold text-gray-500">Name</span> {apt.name}
+                            </p>
+                          ) : null}
+                          {apt.mobile ? (
+                            <p>
+                              <span className="font-semibold text-gray-500">Mobile</span>{" "}
+                              <span className="tabular-nums">
+                                {apt.countryCode ? `${apt.countryCode} ` : ""}
+                                {apt.mobile}
+                              </span>
+                            </p>
+                          ) : null}
+                          {apt.email ? (
+                            <p className="break-all">
+                              <span className="font-semibold text-gray-500">Email</span> {apt.email}
+                            </p>
+                          ) : null}
+                          {apt.notes ? (
+                            <p>
+                              <span className="font-semibold text-gray-500">Notes</span> {apt.notes}
+                            </p>
+                          ) : null}
+                        </div>
                       </div>
                     </li>
                   )})}

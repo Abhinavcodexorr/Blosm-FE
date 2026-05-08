@@ -40,18 +40,23 @@ import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
 import Link from "next/link";
 
 type BookingStep = "services" | "datetime" | "details";
-const AFTER_LOGIN_CONTINUE_KEY = "appointment_continue_after_login";
+const AFTER_LOGIN_CONTINUE_DETAILS_KEY = "appointment_continue_to_details_after_login";
 
 function formatBookingDateLong(ymd: string): string {
   if (!ymd) return "";
   const [y, mo, d] = ymd.split("-").map(Number);
   if (!Number.isFinite(y) || !Number.isFinite(mo) || !Number.isFinite(d)) return ymd;
-  return new Date(y, mo - 1, d).toLocaleDateString("en-AU", {
+  const parts = new Intl.DateTimeFormat("en-AU", {
     weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
-  });
+  }).formatToParts(new Date(y, mo - 1, d));
+  const weekday = parts.find((p) => p.type === "weekday")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  return [weekday, day, month, year].filter(Boolean).join(" ");
 }
 
 export default function AppointmentBookingPage() {
@@ -94,28 +99,6 @@ export default function AppointmentBookingPage() {
       .catch(() => setServiceCategories([]))
       .finally(() => setLoading(false));
   }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!serviceCategories.length) return;
-    if (selectedServiceIds.length > 0) return;
-    const raw = (sessionStorage.getItem("selectedService") || "").trim();
-    if (!raw) return;
-    const wanted = raw.toLowerCase();
-    let matchedLineId = "";
-    outer: for (const cat of serviceCategories) {
-      for (const line of cat.lines) {
-        const name = (line.name || "").toLowerCase();
-        const heading = (cat.heading || "").toLowerCase();
-        if (name === wanted || name.includes(wanted) || wanted.includes(name) || heading === wanted) {
-          matchedLineId = line.id;
-          break outer;
-        }
-      }
-    }
-    sessionStorage.removeItem("selectedService");
-    if (matchedLineId) setSelectedServiceIds([matchedLineId]);
-  }, [serviceCategories, selectedServiceIds.length]);
 
   const summaryLines = useMemo(() => {
     const rows: {
@@ -194,23 +177,17 @@ export default function AppointmentBookingPage() {
   }
 
   function goToDateTime() {
-    if (!token) {
-      if (typeof window !== "undefined") {
-        sessionStorage.setItem(AFTER_LOGIN_CONTINUE_KEY, "1");
-      }
-      setRedirectAfterLogin("/appointment");
-      openLogin();
-      return;
-    }
     continueToDateTimeStep();
   }
 
   function goToDetails() {
     setError("");
     if (!token) {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem(AFTER_LOGIN_CONTINUE_DETAILS_KEY, "1");
+      }
       setRedirectAfterLogin("/appointment");
       openLogin();
-      setError("Please log in to continue booking.");
       return;
     }
     if (!date) {
@@ -312,9 +289,9 @@ export default function AppointmentBookingPage() {
 
   useEffect(() => {
     if (!authReady || !token || typeof window === "undefined") return;
-    if (sessionStorage.getItem(AFTER_LOGIN_CONTINUE_KEY) !== "1") return;
-    sessionStorage.removeItem(AFTER_LOGIN_CONTINUE_KEY);
-    continueToDateTimeStep();
+    if (sessionStorage.getItem(AFTER_LOGIN_CONTINUE_DETAILS_KEY) !== "1") return;
+    sessionStorage.removeItem(AFTER_LOGIN_CONTINUE_DETAILS_KEY);
+    setStep("details");
   }, [authReady, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -646,8 +623,6 @@ export default function AppointmentBookingPage() {
 
           {step === "datetime" ? (
             <BookingDayTimeStep
-              token={token ?? null}
-              openLogin={openLogin}
               onBack={() => {
                 setError("");
                 setStep("services");
@@ -733,8 +708,7 @@ export default function AppointmentBookingPage() {
                     onCountryChange={setCountrySelect}
                     rounded="lg"
                     placeholder="e.g. 412 345 678"
-                    helperText="We may call or text about this appointment. Country code is fixed to +61."
-                    showDigitMeter
+                    helperText="We may call or text about this appointment."
                     borderTone="black"
                     lockToDialCode="+61"
                   />
@@ -787,7 +761,6 @@ export default function AppointmentBookingPage() {
                         <div>
                           <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">Date</p>
                           <p className="mt-0.5 text-sm font-semibold text-charcoal">{formatBookingDateLong(date)}</p>
-                          <p className="text-xs text-gray-500">{date}</p>
                         </div>
                       ) : null}
                       {time ? (
@@ -808,7 +781,7 @@ export default function AppointmentBookingPage() {
 
                     <div>
                       <p className="text-[10px] font-bold uppercase tracking-wider text-amber-600/90">
-                        Services &amp; treatments
+                        Services
                       </p>
                       <ul className="mt-2 space-y-2">
                         {summaryLines.map((row) => {
