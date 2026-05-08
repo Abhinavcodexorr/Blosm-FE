@@ -15,13 +15,53 @@ export default function ReferAndEarnPage() {
 
   const referralCode = useMemo(() => sanitizeMobileDigits(user?.mobile ?? ""), [user?.mobile]);
 
+  const copyTextFallback = (text: string): boolean => {
+    if (typeof document === "undefined") return false;
+    const el = document.createElement("textarea");
+    el.value = text;
+    el.setAttribute("readonly", "true");
+    el.style.position = "fixed";
+    el.style.opacity = "0";
+    el.style.pointerEvents = "none";
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    let ok = false;
+    try {
+      ok = document.execCommand("copy");
+    } catch {
+      ok = false;
+    } finally {
+      document.body.removeChild(el);
+    }
+    return ok;
+  };
+
+  const copyText = async (text: string): Promise<boolean> => {
+    if (!text) return false;
+    try {
+      if (
+        typeof navigator !== "undefined" &&
+        typeof navigator.clipboard !== "undefined" &&
+        typeof navigator.clipboard.writeText === "function" &&
+        (typeof window === "undefined" || window.isSecureContext)
+      ) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+    } catch {
+      // Fallback below.
+    }
+    return copyTextFallback(text);
+  };
+
   const handleCopy = async () => {
     if (!referralCode) return;
-    try {
-      await navigator.clipboard.writeText(referralCode);
+    const ok = await copyText(referralCode);
+    if (ok) {
       setCopyLabel("Copied");
       window.setTimeout(() => setCopyLabel("Copy code"), 1500);
-    } catch {
+    } else {
       setCopyLabel("Copy failed");
       window.setTimeout(() => setCopyLabel("Copy code"), 1500);
     }
@@ -29,21 +69,25 @@ export default function ReferAndEarnPage() {
 
   const handleShare = async () => {
     if (!referralCode) return;
-    if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
-      setShareLabel("Share unavailable");
-      window.setTimeout(() => setShareLabel("Share"), 1800);
-      return;
-    }
+    const shareText = `Use my referral code: ${referralCode}`;
+    const shareUrl = typeof window !== "undefined" ? `${window.location.origin}/refer-and-earn` : undefined;
     try {
-      await navigator.share({
-        title: "Blosm Refer & Earn",
-        text: `Use my referral code: ${referralCode}`,
-      });
-      setShareLabel("Shared");
-      window.setTimeout(() => setShareLabel("Share"), 1500);
+      if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+        await navigator.share({
+          title: "Blosm Refer & Earn",
+          text: shareText,
+          url: shareUrl,
+        });
+        setShareLabel("Shared");
+        window.setTimeout(() => setShareLabel("Share"), 1500);
+        return;
+      }
     } catch {
-      setShareLabel("Share");
+      // Ignore and fallback to copy below.
     }
+    const copied = await copyText(shareUrl ? `${shareText} ${shareUrl}` : shareText);
+    setShareLabel(copied ? "Copied to share" : "Share unavailable");
+    window.setTimeout(() => setShareLabel("Share"), 1800);
   };
 
   return (

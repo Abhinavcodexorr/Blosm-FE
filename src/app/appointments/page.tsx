@@ -21,19 +21,33 @@ function formatDate(d?: string) {
   });
 }
 
-function groupedServiceSelections(apt: MyAppointment): Array<{ heading: string; items: string[] }> {
+function groupedServiceSelections(
+  apt: MyAppointment
+): Array<{ heading: string; items: Array<{ name: string; meta: string }> }> {
   const raw = apt as unknown as Record<string, unknown>;
-  const out = new Map<string, string[]>();
+  const out = new Map<string, Array<{ name: string; meta: string }>>();
   const rows = raw.serviceSelections;
   if (!Array.isArray(rows)) return [];
   for (const row of rows) {
     if (!row || typeof row !== "object") continue;
     const r = row as Record<string, unknown>;
     const heading = String(r.serviceName ?? r.subheading ?? "Service").trim() || "Service";
-    const item = String(r.serviceItemName ?? r.name ?? "").trim();
-    if (!item) continue;
+    const itemName = String(r.serviceItemName ?? r.name ?? "").trim();
+    if (!itemName) continue;
+    const durationLabel = String(r.durationLabel ?? "").trim();
+    const parsedPrice =
+      typeof r.price === "number"
+        ? r.price
+        : typeof r.price === "string"
+          ? Number(r.price)
+          : Number.NaN;
+    const priceLabel = Number.isFinite(parsedPrice) && parsedPrice > 0 ? formatAud(parsedPrice) : "";
+    const meta = [durationLabel, priceLabel].filter(Boolean).join(" · ");
+
     const list = out.get(heading) ?? [];
-    if (!list.includes(item)) list.push(item);
+    if (!list.some((entry) => entry.name === itemName)) {
+      list.push({ name: itemName, meta });
+    }
     out.set(heading, list);
   }
   return Array.from(out.entries()).map(([heading, items]) => ({ heading, items }));
@@ -137,8 +151,9 @@ export default function AppointmentsPage() {
                                   <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700/80">{group.heading}</p>
                                   <ul className="mt-1 list-disc pl-5 space-y-1">
                                     {group.items.map((item) => (
-                                      <li key={`${group.heading}-${item}`} className="text-sm text-charcoal">
-                                        {item}
+                                      <li key={`${group.heading}-${item.name}`} className="text-sm text-charcoal">
+                                        <span className="font-medium">{item.name}</span>
+                                        {item.meta ? <span className="text-xs text-gray-600"> {" · "}{item.meta}</span> : null}
                                       </li>
                                     ))}
                                   </ul>
