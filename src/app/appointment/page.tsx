@@ -278,10 +278,10 @@ export default function AppointmentBookingPage() {
     if (!time || !date) return;
     void clockTick;
     const now = new Date();
-    if (!baseSlots.includes(time) || isSlotTimePassedForSelectedDate(date, time, now)) {
+    if (!durationFitSlots.includes(time) || isSlotTimePassedForSelectedDate(date, time, now)) {
       setTime("");
     }
-  }, [date, time, baseSlots, clockTick]);
+  }, [date, time, durationFitSlots, clockTick]);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
@@ -419,7 +419,6 @@ export default function AppointmentBookingPage() {
 
               <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
                 <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-                  <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Selected Service</p>
                   {groupedBookedServices.length > 0 ? (
                     <div className="space-y-3">
                       {groupedBookedServices.map(([heading, items]) => (
@@ -637,7 +636,7 @@ export default function AppointmentBookingPage() {
               onTimeChange={setTime}
               minYmd={localDateYmd(new Date())}
               maxYmd={maxBookAheadYmd}
-              baseSlots={durationFitSlots}
+              baseSlots={baseSlots}
               availabilityLoading={availabilityLoading}
               availabilityError={availabilityError}
               clockTick={clockTick}
@@ -645,6 +644,7 @@ export default function AppointmentBookingPage() {
               totalSelectedDurationMinutes={totalSelectedDurationMinutes}
               stepError={error}
               bookedSlots={bookedSlots}
+              latestEndTime={availability?.availableTo ?? ""}
             />
           ) : null}
 
@@ -711,6 +711,7 @@ export default function AppointmentBookingPage() {
                     helperText="We may call or text about this appointment."
                     borderTone="black"
                     lockToDialCode="+61"
+                    showPhoneIcon={false}
                   />
 
                   <div>

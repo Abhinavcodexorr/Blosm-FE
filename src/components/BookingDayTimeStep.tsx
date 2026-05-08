@@ -45,15 +45,6 @@ function formatRowDate(ymd: string): string {
   });
 }
 
-function formatTotalTreatmentMinutes(m: number): string {
-  if (m <= 0) return "";
-  if (m < 60) return `${m} min`;
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (r === 0) return `${h} hr`;
-  return `${h} hr ${r} min`;
-}
-
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"] as const;
 
 export type BookingSummaryLine = {
@@ -87,6 +78,8 @@ type Props = {
   stepError?: string;
   /** Existing bookings used to disable overlapping times for selected date. */
   bookedSlots?: BookedSlot[];
+  /** Closing time used to disable starts that cannot fit selected duration. */
+  latestEndTime?: string;
 };
 
 export default function BookingDayTimeStep({
@@ -106,6 +99,7 @@ export default function BookingDayTimeStep({
   totalSelectedDurationMinutes = 0,
   stepError,
   bookedSlots = [],
+  latestEndTime = "",
 }: Props) {
   const minDate = useMemo(() => parseYmd(minYmd), [minYmd]);
   const maxDate = useMemo(() => parseYmd(maxYmd), [maxYmd]);
@@ -204,6 +198,14 @@ export default function BookingDayTimeStep({
     return bookedRangesForDate.some((r) => slotStart < r.end && slotEnd > r.start);
   }
 
+  function isPastClosingForSelectedDuration(slot: string): boolean {
+    if (!(totalSelectedDurationMinutes > 0) || !latestEndTime) return false;
+    const start = parseHHMM(slot);
+    const end = parseHHMM(latestEndTime);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
+    return start + totalSelectedDurationMinutes > end;
+  }
+
   const visibleSlots = useMemo(
     () => bookableSlots.filter((slot) => !isOverlappingBookedRange(slot)),
     [bookableSlots, bookedRangesForDate, totalSelectedDurationMinutes, date]
@@ -214,8 +216,9 @@ export default function BookingDayTimeStep({
     const now = new Date();
     const nowInvalid = isSlotTimePassedForSelectedDate(date, time, now);
     const bookedInvalid = isOverlappingBookedRange(time);
-    if (nowInvalid || bookedInvalid) onTimeChange("");
-  }, [date, time, clockTick, bookedRangesForDate, totalSelectedDurationMinutes, onTimeChange]);
+    const durationInvalid = isPastClosingForSelectedDuration(time);
+    if (nowInvalid || bookedInvalid || durationInvalid) onTimeChange("");
+  }, [date, time, clockTick, bookedRangesForDate, totalSelectedDurationMinutes, latestEndTime, onTimeChange]);
 
   return (
     <section className="relative mx-auto flex w-full max-w-[81rem] flex-col lg:h-full lg:min-h-0">
@@ -398,7 +401,8 @@ export default function BookingDayTimeStep({
                       void clockTick;
                       const now = new Date();
                       const passed = date ? isSlotTimePassedForSelectedDate(date, slot, now) : false;
-                      const disabled = passed;
+                      const tooLateForDuration = isPastClosingForSelectedDuration(slot);
+                      const disabled = passed || tooLateForDuration;
                       const selected = time === slot && !disabled;
                       const endAt =
                         !disabled && totalSelectedDurationMinutes > 0
@@ -406,9 +410,11 @@ export default function BookingDayTimeStep({
                           : "";
                       const slotTitle = passed
                         ? "This time has already passed"
-                        : endAt
-                          ? `${formatTimeToAmPm(slot)} start — ends ${formatTimeToAmPm(endAt)}`
-                          : undefined;
+                        : tooLateForDuration
+                          ? "This start time does not fit the selected service duration"
+                          : endAt
+                            ? `${formatTimeToAmPm(slot)} start — ends ${formatTimeToAmPm(endAt)}`
+                            : undefined;
                       return (
                         <button
                           key={slot}
@@ -483,29 +489,8 @@ export default function BookingDayTimeStep({
                         ))}
                       </ul>
                     )}
-                    {totalSelectedDurationMinutes > 0 ? (
-                      <p className="mt-4 flex items-center justify-between rounded-lg border border-amber-100/80 bg-amber-50/50 px-3 py-2 text-xs font-medium text-amber-900">
-                        <span className="text-amber-700/90">Combined duration</span>
-                        <span className="tabular-nums">{formatTotalTreatmentMinutes(totalSelectedDurationMinutes)}</span>
-                      </p>
-                    ) : null}
                   </div>
                 </div>
-                {time ? (
-                  <div className="rounded-xl border border-gray-100 bg-gradient-to-r from-gray-50/80 to-white px-3 py-2.5 text-xs text-gray-600">
-                    <span className="font-semibold text-charcoal">Time </span>
-                    <span className="font-mono text-[13px] text-gray-800">{formatTimeToAmPm(time)}</span>
-                    {totalSelectedDurationMinutes > 0 ? (
-                      <>
-                        <span className="mx-1.5 text-gray-300">·</span>
-                        <span className="text-gray-500">ends</span>{" "}
-                        <span className="font-mono text-[13px] text-gray-800">
-                          {formatTimeToAmPm(slotEndTimeHHmm(time, totalSelectedDurationMinutes) || "—")}
-                        </span>
-                      </>
-                    ) : null}
-                  </div>
-                ) : null}
               </div>
             </aside>
           </div>

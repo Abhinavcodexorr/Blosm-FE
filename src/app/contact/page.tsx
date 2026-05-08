@@ -77,7 +77,7 @@ export default function ContactPage() {
               </div>
               <h1 className="font-display text-3xl font-light text-charcoal mb-4">Message Sent</h1>
               <p className="text-gray-600 mb-8">
-                Thank you, {name}. We&apos;ll get back to you shortly at {email}.
+                Thank you, {name}! Your enquiry has been received. Our team will get in touch with you shortly.
               </p>
             </div>
           </div>

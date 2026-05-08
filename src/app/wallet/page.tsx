@@ -7,7 +7,6 @@ import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile, type WalletHistoryEntry } from "@/lib/api";
 import { formatAud } from "@/lib/formatCurrency";
-import { formatTimeToAmPm } from "@/lib/timeDisplay";
 
 function formatHistoryWhen(iso: string) {
   if (!iso) return "—";
@@ -141,26 +140,6 @@ export default function WalletPage() {
                     {historySorted.map((entry) => {
                       const debit = isDebitType(entry.type);
                       const amountStr = formatAud(entry.amount) ?? "$0";
-                      const bookingTitle =
-                        entry.appointmentName ||
-                        (entry.appointmentId || entry.appointmentDate || entry.appointmentTime
-                          ? "Appointment"
-                          : null);
-                      const dateLine =
-                        entry.appointmentDate || entry.appointmentTime
-                          ? [
-                              entry.appointmentDate
-                                ? new Date(entry.appointmentDate + "T12:00:00").toLocaleDateString("en-AU", {
-                                    day: "numeric",
-                                    month: "short",
-                                    year: "numeric",
-                                  })
-                                : null,
-                              entry.appointmentTime ? formatTimeToAmPm(entry.appointmentTime) : null,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ")
-                          : null;
                       return (
                         <li key={entry._id} className="px-5 py-4 hover:bg-amber-50/30 transition-colors">
                           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -168,34 +147,8 @@ export default function WalletPage() {
                               <p className="text-xs text-gray-500 tabular-nums">
                                 {formatHistoryWhen(entry.createdAt)}
                               </p>
-                              {bookingTitle ? (
-                                <div className="mt-1.5">
-                                  <p className="text-sm font-semibold text-charcoal">{bookingTitle}</p>
-                                  {dateLine ? (
-                                    <p className="text-xs text-gray-600 mt-0.5">{dateLine}</p>
-                                  ) : null}
-                                </div>
-                              ) : null}
                               <p className="text-sm font-medium text-charcoal mt-1 capitalize">
                                 {entry.type}
-                                {entry.appointmentId && !entry.appointmentName ? (
-                                  <span className="font-normal text-gray-500">
-                                    {" "}
-                                    · ref{" "}
-                                    <span className="font-mono text-xs">
-                                      {entry.appointmentId.slice(-6)}
-                                    </span>
-                                  </span>
-                                ) : null}
-                              </p>
-                              {entry.note ? (
-                                <p className="text-xs text-gray-600 mt-1">{entry.note}</p>
-                              ) : null}
-                              <p className="text-xs text-gray-500 mt-1">
-                                Balance: {formatAud(entry.balanceAfter) ?? "—"}{" "}
-                                <span className="text-gray-400">
-                                  (before {formatAud(entry.balanceBefore) ?? "—"})
-                                </span>
                               </p>
                             </div>
                             <div
