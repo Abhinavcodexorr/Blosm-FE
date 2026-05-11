@@ -132,7 +132,7 @@ export default function AppointmentsPage() {
                           <p className="text-sm font-medium text-charcoal/80">
                             {formatDate(apt.date)}
                             {apt.time ? ` · ${formatTimeToAmPm(apt.time)}` : ""}
-                            {typeof apt.duration === "number" ? ` · ${apt.duration} min` : ""}
+                            {typeof apt.duration === "number" ? ` · ${apt.duration} mins` : ""}
                           </p>
                           {formatAud(apt.price) ? (
                             <p className="mt-2 text-sm font-semibold tabular-nums text-[#8B6914]">

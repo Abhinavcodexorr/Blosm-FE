@@ -5,9 +5,9 @@ export type ApiBookingServiceItem = {
   name: string;
   price: number;
   _id?: string;
-  /** Minutes (number) or a ready-made label (string), e.g. 15 or "15 min" */
+  /** Minutes (number) or a ready-made label (string), e.g. 15 or "15 mins" */
   duration?: number | string;
-  /** Time / duration from API: number = minutes, string = label or digits e.g. `"15"` → `15 min` */
+  /** Time / duration from API: number = minutes, string = label or digits e.g. `"15"` → `15 mins` */
   time?: string | number;
   /** Some backends use this key for minutes */
   durationMinutes?: number;
@@ -146,11 +146,11 @@ function bookingServiceIdForLine(serviceId: string, item: ApiBookingServiceItem)
   return serviceId;
 }
 
-/** If the API sends a bare number as text (e.g. "15"), show "15 min". */
+/** If the API sends a bare number as text (e.g. "15"), show "15 mins". */
 function normalizeMinutesDisplay(raw: string): string {
   const s = raw.trim();
   if (!s) return "";
-  if (/^\d+$/.test(s)) return `${s} min`;
+  if (/^\d+$/.test(s)) return `${s} mins`;
   return s;
 }
 
@@ -158,7 +158,7 @@ function normalizeMinutesDisplay(raw: string): string {
 export function formatServiceItemDurationLabel(item: ApiBookingServiceItem): string {
   if (item.time != null) {
     if (typeof item.time === "number" && Number.isFinite(item.time) && item.time > 0) {
-      return `${item.time} min`;
+      return `${item.time} mins`;
     }
     const timeStr = String(item.time).trim();
     if (timeStr) return normalizeMinutesDisplay(timeStr);
@@ -166,12 +166,12 @@ export function formatServiceItemDurationLabel(item: ApiBookingServiceItem): str
 
   const mins = item.durationMinutes;
   if (typeof mins === "number" && Number.isFinite(mins) && mins > 0) {
-    return `${mins} min`;
+    return `${mins} mins`;
   }
 
   const d = item.duration;
   if (typeof d === "number" && Number.isFinite(d) && d > 0) {
-    return `${d} min`;
+    return `${d} mins`;
   }
   if (typeof d === "string" && d.trim()) {
     return normalizeMinutesDisplay(d.trim());
@@ -180,7 +180,7 @@ export function formatServiceItemDurationLabel(item: ApiBookingServiceItem): str
   return "";
 }
 
-/** First integer in a string (e.g. "15 min" → 15, "60–90" → 60). */
+/** First integer in a string (e.g. "15 mins" → 15, "60–90" → 60). */
 function firstPositiveIntInString(s: string): number | null {
   const m = s.match(/(\d+)/);
   if (!m) return null;

@@ -613,7 +613,7 @@ export default function AppointmentBookingPage() {
                     {summaryLines.length > 0 && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-500">
-                          {totalSelectedDurationMinutes > 0 ? `Est. ${totalSelectedDurationMinutes} min` : "Est. total"}
+                          {totalSelectedDurationMinutes > 0 ? `Est. ${totalSelectedDurationMinutes} mins` : "Est. total"}
                         </span>
                         <span className="font-semibold text-charcoal">
                           {fmtAudBooking.format(summaryLines.reduce((s, r) => s + r.price, 0))}
