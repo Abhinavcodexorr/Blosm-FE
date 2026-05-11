@@ -207,9 +207,53 @@ export default function BookingDayTimeStep({
   }
 
   const visibleSlots = useMemo(
-    () => bookableSlots.filter((slot) => !isOverlappingBookedRange(slot)),
-    [bookableSlots, bookedRangesForDate, totalSelectedDurationMinutes, date]
+    () =>
+      bookableSlots.filter(
+        (slot) => !isOverlappingBookedRange(slot) && !isPastClosingForSelectedDuration(slot)
+      ),
+    [bookableSlots, bookedRangesForDate, totalSelectedDurationMinutes, latestEndTime, date]
   );
+
+  /**
+   * For each date in the calendar grid, decide if it has at least one slot that:
+   *   - hasn't passed (today only)
+   *   - fits the selected duration before closing
+   *   - doesn't overlap any existing booking
+   * Dates with zero fitting slots are flagged so the calendar can disable them.
+   */
+  const datesWithoutFittingSlots = useMemo(() => {
+    const set = new Set<string>();
+    if (baseSlots.length === 0) return set;
+    void clockTick;
+    const now = new Date();
+    const closingMinutes = parseHHMM(latestEndTime);
+    const hasDurationLimit =
+      totalSelectedDurationMinutes > 0 && Number.isFinite(closingMinutes);
+    const slotDuration =
+      totalSelectedDurationMinutes > 0 ? totalSelectedDurationMinutes : SLOT_STEP_MINUTES;
+
+    for (const cell of grid) {
+      if (cell.ymd == null || cell.disabled) continue;
+      const ymd = cell.ymd;
+      const ranges = bookedSlots
+        .filter((row) => row.date === ymd)
+        .map((row) => ({ start: parseHHMM(row.start), end: parseHHMM(row.end) }))
+        .filter((r) => Number.isFinite(r.start) && Number.isFinite(r.end) && r.end > r.start);
+
+      const anyFits = baseSlots.some((slot) => {
+        if (isSlotTimePassedForSelectedDate(ymd, slot, now)) return false;
+        const start = parseHHMM(slot);
+        if (!Number.isFinite(start)) return false;
+        if (hasDurationLimit && start + totalSelectedDurationMinutes > closingMinutes) return false;
+        const end = start + slotDuration;
+        const overlapsBooked = ranges.some((r) => start < r.end && end > r.start);
+        return !overlapsBooked;
+      });
+
+      if (!anyFits) set.add(ymd);
+    }
+    return set;
+  }, [grid, baseSlots, bookedSlots, totalSelectedDurationMinutes, latestEndTime, clockTick]);
 
   useEffect(() => {
     if (!date || !time) return;
@@ -219,6 +263,14 @@ export default function BookingDayTimeStep({
     const durationInvalid = isPastClosingForSelectedDuration(time);
     if (nowInvalid || bookedInvalid || durationInvalid) onTimeChange("");
   }, [date, time, clockTick, bookedRangesForDate, totalSelectedDurationMinutes, latestEndTime, onTimeChange]);
+
+  useEffect(() => {
+    if (!date) return;
+    if (datesWithoutFittingSlots.has(date)) {
+      onDateChange("");
+      onTimeChange("");
+    }
+  }, [date, datesWithoutFittingSlots, onDateChange, onTimeChange]);
 
   return (
     <section className="relative mx-auto flex w-full max-w-[81rem] flex-col lg:h-full lg:min-h-0">
@@ -236,7 +288,7 @@ export default function BookingDayTimeStep({
           <button
             type="button"
             onClick={onBack}
-            className="absolute -left-3 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-charcoal shadow-sm transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 active:scale-[0.97] sm:-left-36"
+            className="absolute left-0 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border border-gray-200 bg-white text-charcoal shadow-sm transition-all hover:border-amber-200 hover:bg-amber-50 hover:text-amber-700 active:scale-[0.97] sm:left-2"
             aria-label="Back to services"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -301,21 +353,27 @@ export default function BookingDayTimeStep({
                       return <div key={`e-${i}`} className="aspect-square min-h-[2.45rem]" />;
                     }
                     const selected = date === cell.ymd;
+                    const noFittingSlots = datesWithoutFittingSlots.has(cell.ymd);
+                    const cellDisabled = cell.disabled || noFittingSlots;
+                    const cellTitle = noFittingSlots
+                      ? "No time slots fit the selected service duration on this day"
+                      : undefined;
                     return (
                       <button
                         key={cell.ymd}
                         type="button"
                         role="gridcell"
-                        disabled={cell.disabled}
+                        disabled={cellDisabled}
+                        title={cellTitle}
                         onClick={() => {
-                          if (!cell.disabled && cell.ymd) {
+                          if (!cellDisabled && cell.ymd) {
                             onDateChange(cell.ymd);
                             onTimeChange("");
                           }
                         }}
                         aria-selected={selected}
                         className={`mx-auto flex aspect-square min-h-[2.45rem] w-full max-w-[2.6rem] items-center justify-center rounded-full text-[13px] font-semibold transition-all duration-200 ${
-                          cell.disabled
+                          cellDisabled
                             ? "cursor-not-allowed text-gray-300"
                             : selected
                               ? "bg-gradient-to-b from-amber-500 to-amber-600 text-white shadow-lg shadow-amber-500/35 ring-2 ring-amber-400/40"

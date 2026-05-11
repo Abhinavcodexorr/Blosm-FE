@@ -417,8 +417,49 @@ export default function AppointmentBookingPage() {
                 We&apos;ve sent an email confirmation to your provided email address.
               </p>
 
-              <div className="grid gap-4 md:grid-cols-[1.2fr_1fr]">
+              <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
                 <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Location</p>
+                    <p className="text-sm font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
+                    <p className="text-xs text-gray-600">{SALON_BOOKING_ADDRESS}</p>
+                  </div>
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                      `${SALON_BOOKING_NAME}, ${SALON_BOOKING_ADDRESS}`
+                    )}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="block overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm transition-shadow hover:shadow-md"
+                    aria-label={`Open ${SALON_BOOKING_NAME} on Google Maps`}
+                  >
+                    <iframe
+                      title={`Map of ${SALON_BOOKING_NAME}`}
+                      src={`https://www.google.com/maps?q=${encodeURIComponent(
+                        `${SALON_BOOKING_NAME}, ${SALON_BOOKING_ADDRESS}`
+                      )}&output=embed`}
+                      loading="lazy"
+                      referrerPolicy="no-referrer-when-downgrade"
+                      className="pointer-events-none h-28 w-full border-0 sm:h-32"
+                    />
+                  </a>
+                  <p className="text-sm text-charcoal/90 font-semibold leading-relaxed">
+                    Your appointment is confirmed! A confirmation has been sent to your contact details.
+                    We look forward to seeing you.
+                  </p>
+                </div>
+
+                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Date</p>
+                    <p className="text-sm font-semibold text-charcoal">{date ? formatBookingDateLong(date) : "—"}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Time</p>
+                    <p className="text-sm font-semibold text-charcoal">
+                      {formattedStart ? `${formattedStart}${formattedEnd ? ` - ${formattedEnd}` : ""}` : "—"}
+                    </p>
+                  </div>
                   {groupedBookedServices.length > 0 ? (
                     <div className="space-y-3">
                       {groupedBookedServices.map(([heading, items]) => (
@@ -437,28 +478,6 @@ export default function AppointmentBookingPage() {
                   ) : (
                     <p className="text-sm text-gray-600">{serviceTitle || "Service details saved."}</p>
                   )}
-                </div>
-
-                <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Date</p>
-                    <p className="text-sm font-semibold text-charcoal">{date ? formatBookingDateLong(date) : "—"}</p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Time</p>
-                    <p className="text-sm font-semibold text-charcoal">
-                      {formattedStart ? `${formattedStart}${formattedEnd ? ` - ${formattedEnd}` : ""}` : "—"}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Venue</p>
-                    <p className="text-sm font-semibold text-charcoal">{SALON_BOOKING_NAME}</p>
-                    <p className="text-xs text-gray-600">{SALON_BOOKING_ADDRESS}</p>
-                  </div>
-                  <p className="text-sm text-charcoal/90 font-semibold leading-relaxed">
-                    Your appointment is confirmed! A confirmation has been sent to your contact details.
-                    We look forward to seeing you.
-                  </p>
                 </div>
               </div>
 
@@ -487,7 +506,15 @@ export default function AppointmentBookingPage() {
   return (
     <main className="bg-[#f4f4f5] flex min-h-screen flex-col">
       <Header />
-      <section className={step === "services" ? "pt-28 pb-24 md:pb-28 lg:pb-4" : "pt-28 pb-16 md:pb-24"}>
+      <section
+        className={
+          step === "services"
+            ? "pt-28 pb-24 md:pb-28 lg:pb-4"
+            : step === "datetime"
+              ? "pt-28 pb-16 md:pb-24 lg:pb-4"
+              : "pt-28 pb-16 md:pb-24"
+        }
+      >
         <div className={step === "services" ? "mx-auto w-full max-w-6xl px-4 sm:px-6" : "max-w-6xl mx-auto px-4 sm:px-6"}>
           {step === "services" ? (
             <div className="flex flex-col gap-3 min-h-[calc(100dvh-7rem)] lg:h-[calc(100vh-7rem)] lg:min-h-0">
@@ -621,31 +648,33 @@ export default function AppointmentBookingPage() {
           ) : null}
 
           {step === "datetime" ? (
-            <BookingDayTimeStep
-              onBack={() => {
-                setError("");
-                setStep("services");
-              }}
-              onContinue={goToDetails}
-              date={date}
-              onDateChange={(v) => {
-                setDate(v);
-                setTime("");
-              }}
-              time={time}
-              onTimeChange={setTime}
-              minYmd={localDateYmd(new Date())}
-              maxYmd={maxBookAheadYmd}
-              baseSlots={baseSlots}
-              availabilityLoading={availabilityLoading}
-              availabilityError={availabilityError}
-              clockTick={clockTick}
-              summaryLines={summaryLines}
-              totalSelectedDurationMinutes={totalSelectedDurationMinutes}
-              stepError={error}
-              bookedSlots={bookedSlots}
-              latestEndTime={availability?.availableTo ?? ""}
-            />
+            <div className="flex min-h-0 flex-col lg:h-[calc(100vh-8rem)] lg:overflow-hidden">
+              <BookingDayTimeStep
+                onBack={() => {
+                  setError("");
+                  setStep("services");
+                }}
+                onContinue={goToDetails}
+                date={date}
+                onDateChange={(v) => {
+                  setDate(v);
+                  setTime("");
+                }}
+                time={time}
+                onTimeChange={setTime}
+                minYmd={localDateYmd(new Date())}
+                maxYmd={maxBookAheadYmd}
+                baseSlots={baseSlots}
+                availabilityLoading={availabilityLoading}
+                availabilityError={availabilityError}
+                clockTick={clockTick}
+                summaryLines={summaryLines}
+                totalSelectedDurationMinutes={totalSelectedDurationMinutes}
+                stepError={error}
+                bookedSlots={bookedSlots}
+                latestEndTime={availability?.availableTo ?? ""}
+              />
+            </div>
           ) : null}
 
           {step === "details" ? (
