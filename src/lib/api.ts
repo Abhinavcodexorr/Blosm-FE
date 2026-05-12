@@ -103,6 +103,11 @@ export type PublicUser = {
   email: string | null;
   wallet: number;
   walletHistory?: WalletHistoryEntry[];
+  /** Signup + referral reward amounts from `user.bonuses` (when API returns it). */
+  bonuses?: {
+    signupBonus?: number;
+    referralBonus?: number;
+  };
 };
 
 export type VerifyOtpResult = {
@@ -129,6 +134,7 @@ function parsePublicUser(raw: unknown): PublicUser {
         ? Number(walletRaw) || 0
         : 0;
   const wh = parseWalletHistory(o.walletHistory);
+  const bonuses = parseBonuses(o.bonuses);
   return {
     _id: String(o._id ?? ""),
     mobile: String(o.mobile ?? ""),
@@ -137,7 +143,28 @@ function parsePublicUser(raw: unknown): PublicUser {
     email: o.email == null || o.email === "" ? null : String(o.email),
     wallet,
     ...(wh ? { walletHistory: wh } : {}),
+    ...(bonuses ? { bonuses } : {}),
   };
+}
+
+function parseBonuses(raw: unknown): PublicUser["bonuses"] | undefined {
+  if (!raw || typeof raw !== "object") return undefined;
+  const b = raw as Record<string, unknown>;
+  const toNum = (v: unknown): number | undefined => {
+    if (typeof v === "number" && Number.isFinite(v)) return v;
+    if (typeof v === "string" && v.trim() !== "") {
+      const n = Number(v);
+      if (Number.isFinite(n)) return n;
+    }
+    return undefined;
+  };
+  const signupBonus = toNum(b.signupBonus);
+  const referralBonus = toNum(b.referralBonus);
+  if (signupBonus === undefined && referralBonus === undefined) return undefined;
+  const out: NonNullable<PublicUser["bonuses"]> = {};
+  if (signupBonus !== undefined) out.signupBonus = signupBonus;
+  if (referralBonus !== undefined) out.referralBonus = referralBonus;
+  return out;
 }
 
 function parseBooleanField(raw: Record<string, unknown>, keys: string[]): boolean {

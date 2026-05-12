@@ -8,21 +8,53 @@ import { useLoginModal } from "@/context/LoginModalContext";
 import { getProfile, type WalletHistoryEntry } from "@/lib/api";
 import { formatAud } from "@/lib/formatCurrency";
 
-function formatHistoryWhen(iso: string) {
-  if (!iso) return "—";
+function isDebitType(type: string) {
+  return type.toLowerCase() === "debit";
+}
+
+function formatAppointmentDate(iso: string | null) {
+  if (!iso) return null;
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-AU", {
+  return d.toLocaleDateString("en-AU", {
     day: "numeric",
     month: "short",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
 }
 
-function isDebitType(type: string) {
-  return type.toLowerCase() === "debit";
+function isSignupBonus(entry: WalletHistoryEntry) {
+  const haystack = `${entry.type} ${entry.note ?? ""}`.toLowerCase();
+  return /signup|sign[- ]?up|welcome|joining|first[- ]?login|new[- ]?user/.test(
+    haystack
+  );
+}
+
+function isReferralBonus(entry: WalletHistoryEntry) {
+  const haystack = `${entry.type} ${entry.note ?? ""}`.toLowerCase();
+  return /refer|invite/.test(haystack);
+}
+
+function getEntryLabel(entry: WalletHistoryEntry) {
+  if (entry.appointmentId) {
+    const when = [formatAppointmentDate(entry.appointmentDate), entry.appointmentTime]
+      .filter((x): x is string => !!x)
+      .join(" · ");
+    return {
+      title: "Appointment",
+      when,
+    };
+  }
+  if (isSignupBonus(entry)) {
+    return { title: "Signup bonus", when: "" };
+  }
+  if (isReferralBonus(entry)) {
+    return { title: "Referral bonus", when: "" };
+  }
+  return {
+    title: entry.note?.trim() || "Wallet",
+    when: "",
+  };
 }
 
 export default function WalletPage() {
@@ -54,6 +86,11 @@ export default function WalletPage() {
   }, [token, setAuth]);
 
   const balanceLabel = formatAud(user?.wallet ?? 0) ?? "$0";
+  const signupBonus = user?.bonuses?.signupBonus;
+  const referralBonus = user?.bonuses?.referralBonus;
+  const showSignupBonus = typeof signupBonus === "number";
+  const showReferralBonus = typeof referralBonus === "number" && referralBonus > 0;
+  const showBonusesBlock = showSignupBonus || showReferralBonus;
 
   return (
     <main className="min-h-screen">
@@ -106,6 +143,31 @@ export default function WalletPage() {
                   )}
                 </div>
                 <div className="px-6 py-6 space-y-4">
+                  {showBonusesBlock ? (
+                    <div className="rounded-xl border border-amber-100/80 bg-amber-50/40 p-4">
+                      <p className="text-[11px] font-bold uppercase tracking-wide text-amber-700/90 mb-2">
+                        Bonuses
+                      </p>
+                      <div className="space-y-1.5">
+                        {showSignupBonus ? (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-charcoal">Signup bonus</span>
+                            <span className="font-semibold tabular-nums text-emerald-700">
+                              +{formatAud(signupBonus ?? 0) ?? "$0"}
+                            </span>
+                          </div>
+                        ) : null}
+                        {showReferralBonus ? (
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-charcoal">Referral bonus</span>
+                            <span className="font-semibold tabular-nums text-emerald-700">
+                              +{formatAud(referralBonus ?? 0) ?? "$0"}
+                            </span>
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                   <p className="text-sm text-gray-600 leading-relaxed">
                     Loyalty rewards and top-ups will appear here after they are added to your account.
                   </p>
@@ -140,16 +202,19 @@ export default function WalletPage() {
                     {historySorted.map((entry) => {
                       const debit = isDebitType(entry.type);
                       const amountStr = formatAud(entry.amount) ?? "$0";
+                      const label = getEntryLabel(entry);
                       return (
                         <li key={entry._id} className="px-5 py-4 hover:bg-amber-50/30 transition-colors">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <p className="text-xs text-gray-500 tabular-nums">
-                                {formatHistoryWhen(entry.createdAt)}
+                              <p className="text-sm font-medium text-charcoal">
+                                {label.title}
                               </p>
-                              <p className="text-sm font-medium text-charcoal mt-1 capitalize">
-                                {entry.type}
-                              </p>
+                              {label.when && (
+                                <p className="text-xs text-gray-500 mt-0.5 tabular-nums">
+                                  {label.when}
+                                </p>
+                              )}
                             </div>
                             <div
                               className={`text-base font-semibold tabular-nums shrink-0 ${
