@@ -23,8 +23,6 @@ type Props = {
   borderTone?: "amber" | "black";
   /** Restrict country select to one dial code (e.g. `+61`). */
   lockToDialCode?: string;
-  /** Hide the phone icon in the country-code section. */
-  showPhoneIcon?: boolean;
 };
 
 export default function PhoneCountryField({
@@ -41,7 +39,6 @@ export default function PhoneCountryField({
   showDigitMeter = false,
   borderTone = "amber",
   lockToDialCode,
-  showPhoneIcon = true,
 }: Props) {
   const hintId = useId();
   const meterId = useId();
@@ -75,22 +72,10 @@ export default function PhoneCountryField({
       </label>
       <div className={`flex ${r} border bg-white overflow-hidden shadow-sm transition-all focus-within:ring-2 ${wrapperToneClass} ${wrapperRingClass}`}>
         <div className="relative shrink-0 border-r border-gray-200 bg-gradient-to-b from-rose-50/80 to-rose-50/30">
-          {showPhoneIcon ? (
-            <span className="pointer-events-none absolute left-2 top-1/2 z-[1] -translate-y-1/2 text-gray-400" aria-hidden>
-              <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"
-                />
-              </svg>
-            </span>
-          ) : null}
           <select
             value={forcedValue}
             onChange={(e) => onCountryChange(e.target.value)}
-            className={`w-[5.75rem] border-0 bg-transparent sm:w-[6.25rem] ${py} ${showPhoneIcon ? "pl-8" : "pl-3"} pr-7 text-sm font-semibold tabular-nums text-charcoal focus:outline-none focus:ring-0 appearance-none bg-[length:12px] bg-[right_0.4rem_center] bg-no-repeat ${
+            className={`w-[5.75rem] border-0 bg-transparent sm:w-[6.25rem] ${py} pl-3 pr-7 text-sm font-semibold tabular-nums text-charcoal focus:outline-none focus:ring-0 appearance-none bg-[length:12px] bg-[right_0.4rem_center] bg-no-repeat ${
               isSelectLocked ? "cursor-default" : "cursor-pointer"
             }`}
             style={{

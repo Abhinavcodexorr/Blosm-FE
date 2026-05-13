@@ -740,7 +740,6 @@ export default function AppointmentBookingPage() {
                     helperText="We may call or text about this appointment."
                     borderTone="black"
                     lockToDialCode="+61"
-                    showPhoneIcon={false}
                   />
 
                   <div>
