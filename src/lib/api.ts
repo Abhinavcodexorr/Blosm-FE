@@ -20,8 +20,42 @@ function getErrorMessageFromPayload(payload: unknown): string {
   return "";
 }
 
+function getPayloadStatusCode(payload: unknown): number | null {
+  if (!payload || typeof payload !== "object") return null;
+  const sc = (payload as Record<string, unknown>).statusCode;
+  if (typeof sc === "number" && Number.isFinite(sc)) return sc;
+  if (typeof sc === "string" && sc.trim() !== "") {
+    const n = Number(sc);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+/** Account no longer exists (deleted user) — clear local session. */
+function isUserNotFoundResponse(res: Response, payload: unknown): boolean {
+  const http404 = res.status === 404;
+  const body404 = getPayloadStatusCode(payload) === 404;
+  if (!http404 && !body404) return false;
+
+  const msg = getErrorMessageFromPayload(payload).toLowerCase();
+  if (msg.includes("user not found")) return true;
+
+  if (payload && typeof payload === "object") {
+    const err = (payload as Record<string, unknown>).error;
+    if (err && typeof err === "object") {
+      const nested = (err as Record<string, unknown>).message;
+      if (typeof nested === "string" && nested.toLowerCase().includes("user not found")) return true;
+    }
+  }
+  return false;
+}
+
 function maybeHandleAuthExpired(res: Response, payload: unknown): boolean {
   if (res.status === 401 || res.status === 403) {
+    emitAuthExpired();
+    return true;
+  }
+  if (isUserNotFoundResponse(res, payload)) {
     emitAuthExpired();
     return true;
   }
