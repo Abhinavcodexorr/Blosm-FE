@@ -68,6 +68,17 @@ export default function WalletPage() {
     );
   }, [user?.walletHistory]);
 
+  /** Avoid showing the same bonus twice: summary comes from `user.bonuses`, history hides matching ledger rows. */
+  const historyForDisplay = useMemo(() => {
+    const signupFromApi = typeof user?.bonuses?.signupBonus === "number";
+    const referralFromApi = typeof user?.bonuses?.referralBonus === "number" && (user?.bonuses?.referralBonus ?? 0) > 0;
+    return historySorted.filter((entry) => {
+      if (signupFromApi && isSignupBonus(entry)) return false;
+      if (referralFromApi && isReferralBonus(entry)) return false;
+      return true;
+    });
+  }, [historySorted, user?.bonuses?.signupBonus, user?.bonuses?.referralBonus]);
+
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -195,11 +206,11 @@ export default function WalletPage() {
                 </div>
                 {profileRefreshing && historySorted.length === 0 ? (
                   <p className="px-5 py-10 text-center text-sm text-gray-500">Loading history…</p>
-                ) : historySorted.length === 0 ? (
+                ) : historyForDisplay.length === 0 ? (
                   <p className="px-5 py-10 text-center text-sm text-gray-500">No wallet activity yet.</p>
                 ) : (
                   <ul className="divide-y divide-gray-100">
-                    {historySorted.map((entry) => {
+                    {historyForDisplay.map((entry) => {
                       const debit = isDebitType(entry.type);
                       const amountStr = formatAud(entry.amount) ?? "$0";
                       const label = getEntryLabel(entry);
