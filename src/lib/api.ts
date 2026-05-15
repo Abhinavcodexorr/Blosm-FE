@@ -69,16 +69,9 @@ function maybeHandleAuthExpired(res: Response, payload: unknown): boolean {
   return false;
 }
 
-export async function sendOtp(mobile: string, countryCode: string) {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/send-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mobile, countryCode }),
-    credentials: "include",
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || data.message || "Failed to send OTP");
-  return data;
+/** @deprecated OTP endpoints removed from backend. */
+export async function sendOtp(_mobile: string, _countryCode: string) {
+  throw new Error("OTP login has been removed. Please use email/password.");
 }
 
 /** Single wallet ledger row from `GET /users/me` and verify-otp user payload. */
@@ -131,6 +124,7 @@ function parseWalletHistory(raw: unknown): WalletHistoryEntry[] | undefined {
 /** Matches backend `toPublicUser` (verify-otp + GET /users/me). */
 export type PublicUser = {
   _id: string;
+  username?: string;
   mobile: string;
   countryCode: string;
   name: string | null;
@@ -144,10 +138,26 @@ export type PublicUser = {
   };
 };
 
-export type VerifyOtpResult = {
+export type AuthResult = {
   token: string;
   user: PublicUser;
   isFirstLogin: boolean;
+};
+
+/** @deprecated Use AuthResult */
+export type VerifyOtpResult = AuthResult;
+
+export type RegisterBody = {
+  username: string;
+  email: string;
+  mobile: string;
+  countryCode: string;
+  password: string;
+};
+
+export type LoginBody = {
+  email: string;
+  password: string;
 };
 
 export type RedeemInviteCodeResult = {
@@ -171,6 +181,7 @@ function parsePublicUser(raw: unknown): PublicUser {
   const bonuses = parseBonuses(o.bonuses);
   return {
     _id: String(o._id ?? ""),
+    username: o.username != null && o.username !== "" ? String(o.username) : undefined,
     mobile: String(o.mobile ?? ""),
     countryCode: String(o.countryCode ?? ""),
     name: o.name == null || o.name === "" ? null : String(o.name),
@@ -221,27 +232,63 @@ function parseNumberField(raw: Record<string, unknown>, keys: string[]): number 
   return undefined;
 }
 
-export async function verifyOtp(mobile: string, countryCode: string, otp: string): Promise<VerifyOtpResult> {
-  const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ mobile, countryCode, otp }),
-    credentials: "include",
-  });
-  const json = await res.json();
-  if (!res.ok || !json.success) throw new Error(json.message || json.error?.message || "Invalid OTP");
-  const data = json.data && typeof json.data === "object" ? (json.data as Record<string, unknown>) : {};
-  const token = data.token;
-  const rawUser = data.user;
+function parseAuthEnvelope(json: unknown): AuthResult {
+  if (!json || typeof json !== "object") {
+    throw new Error("Invalid response");
+  }
+  const root = json as Record<string, unknown>;
+  const data =
+    root.data && typeof root.data === "object" ? (root.data as Record<string, unknown>) : root;
+  const token = data.token ?? root.token;
+  const rawUser = data.user ?? root.user;
   if (!token || rawUser == null || typeof rawUser !== "object") {
     throw new Error("Invalid response");
   }
   const isFirstLogin =
     parseBooleanField(data, ["isFirstLogin", "isNewUser", "isNew", "firstLogin"]) ||
+    parseBooleanField(root, ["isFirstLogin", "isNewUser", "isNew", "firstLogin"]) ||
     (rawUser && typeof rawUser === "object"
       ? parseBooleanField(rawUser as Record<string, unknown>, ["isFirstLogin", "isNewUser", "isNew", "firstLogin"])
       : false);
   return { token: String(token), user: parsePublicUser(rawUser), isFirstLogin };
+}
+
+function authErrorMessage(json: unknown, fallback: string): string {
+  const msg = getErrorMessageFromPayload(json);
+  return msg || fallback;
+}
+
+export async function registerUser(body: RegisterBody): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || (json && typeof json === "object" && "success" in json && (json as { success?: boolean }).success === false)) {
+    throw new Error(authErrorMessage(json, "Failed to create account"));
+  }
+  return parseAuthEnvelope(json);
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<AuthResult> {
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: email.trim(), password }),
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok || (json && typeof json === "object" && "success" in json && (json as { success?: boolean }).success === false)) {
+    throw new Error(authErrorMessage(json, "Invalid email or password"));
+  }
+  return parseAuthEnvelope(json);
+}
+
+/** @deprecated OTP endpoints removed from backend. */
+export async function verifyOtp(_mobile: string, _countryCode: string, _otp: string): Promise<AuthResult> {
+  throw new Error("OTP login has been removed. Please use email/password.");
 }
 
 export async function redeemInviteCode(token: string, inviteCode: string): Promise<RedeemInviteCodeResult> {
