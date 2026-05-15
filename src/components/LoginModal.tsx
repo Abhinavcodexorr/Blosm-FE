@@ -30,7 +30,7 @@ export default function LoginModal() {
   const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
   const router = useRouter();
   const [mode, setMode] = useState<AuthMode>("signup");
-  const [username, setUsername] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -89,7 +89,7 @@ export default function LoginModal() {
 
   const resetForm = () => {
     setMode("signup");
-    setUsername("");
+    setName("");
     setEmail("");
     setPassword("");
     setShowPassword(false);
@@ -148,12 +148,12 @@ export default function LoginModal() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const name = username.trim();
+    const trimmedName = name.trim();
     const emailTrimmed = email.trim();
     const digits = sanitizeMobileDigits(mobile);
 
-    if (!name) {
-      setError("Please enter a username.");
+    if (!trimmedName) {
+      setError("Please enter your name.");
       return;
     }
     if (!isValidEmail(emailTrimmed)) {
@@ -172,7 +172,7 @@ export default function LoginModal() {
     setLoading(true);
     try {
       const { token, user, isFirstLogin } = await registerUser({
-        username: name,
+        name: trimmedName,
         email: emailTrimmed,
         mobile: digits,
         countryCode: dialFromSelection(countrySelect),
@@ -269,7 +269,7 @@ export default function LoginModal() {
       const result = await redeemInviteCode(pendingToken, code);
       setInviteMessage(
         result.message ||
-          `Invite applied successfully. Referrer gets $${result.creditedAmount ?? 100}.`
+        `Invite applied successfully. Referrer gets $${result.creditedAmount ?? 100}.`
       );
       await completeLoginAfterInviteStep(pendingToken, pendingUserId);
     } catch (err) {
@@ -357,16 +357,16 @@ export default function LoginModal() {
                   <form onSubmit={mode === "signup" ? handleSignup : handleLogin} className="space-y-4">
                     {mode === "signup" && (
                       <div className="modal-input-focus rounded-xl">
-                        <label htmlFor="signup-username" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                          Username
+                        <label htmlFor="signup-name" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                          Name
                         </label>
                         <input
-                          id="signup-username"
+                          id="signup-name"
                           type="text"
-                          autoComplete="username"
-                          value={username}
-                          onChange={(e) => setUsername(e.target.value)}
-                          placeholder="johndoe"
+                          autoComplete="name"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          placeholder="Jane Smith"
                           className={inputClass}
                         />
                       </div>
@@ -397,6 +397,7 @@ export default function LoginModal() {
                         onCountryChange={setCountrySelect}
                         rounded="xl"
                         placeholder="e.g. 410 123 456"
+                        labelClassName="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"
                       />
                     )}
 

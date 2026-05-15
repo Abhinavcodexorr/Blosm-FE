@@ -468,8 +468,8 @@ export async function getAppointmentsBookedSlots(params?: {
   const source =
     (Array.isArray(root.data) && root.data) ||
     (root.data &&
-    typeof root.data === "object" &&
-    Array.isArray((root.data as Record<string, unknown>).bookedSlots)
+      typeof root.data === "object" &&
+      Array.isArray((root.data as Record<string, unknown>).bookedSlots)
       ? ((root.data as Record<string, unknown>).bookedSlots as unknown[])
       : null) ||
     (Array.isArray(root.bookedSlots) ? (root.bookedSlots as unknown[]) : null) ||

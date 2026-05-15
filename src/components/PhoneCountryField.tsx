@@ -23,6 +23,8 @@ type Props = {
   borderTone?: "amber" | "black";
   /** Restrict country select to one dial code (e.g. `+61`). */
   lockToDialCode?: string;
+  /** Custom class for the label. */
+  labelClassName?: string;
 };
 
 export default function PhoneCountryField({
@@ -39,6 +41,7 @@ export default function PhoneCountryField({
   showDigitMeter = false,
   borderTone = "amber",
   lockToDialCode,
+  labelClassName = "block text-sm font-medium text-charcoal mb-2",
 }: Props) {
   const hintId = useId();
   const meterId = useId();
@@ -67,7 +70,7 @@ export default function PhoneCountryField({
 
   return (
     <div>
-      <label htmlFor={id} className="block text-sm font-medium text-charcoal mb-2">
+      <label htmlFor={id} className={labelClassName}>
         {label}
       </label>
       <div className={`flex ${r} border bg-white overflow-hidden shadow-sm transition-all ${wrapperToneClass} ${wrapperRingClass}`}>
