@@ -100,14 +100,14 @@ export default function ReferAndEarnPage() {
               <p className="text-xs uppercase tracking-[0.25em] text-amber-800/70 mb-2">Refer & Earn</p>
               <h1 className="font-display text-3xl font-light text-charcoal mb-3">Share and earn rewards</h1>
               <p className="text-gray-600 mb-8 leading-relaxed">
-                Log in to view your referral code and start earning ${REFERRAL_REWARD_AMOUNT} for each successful invite.
+                Sign in to view your referral code and start earning ${REFERRAL_REWARD_AMOUNT} for each successful invite.
               </p>
               <button
                 type="button"
                 onClick={openLogin}
                 className="inline-flex justify-center items-center rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-8 py-3 text-sm font-semibold text-white shadow-md shadow-amber-500/25 transition hover:from-amber-600 hover:to-amber-700"
               >
-                Log in
+                Sign in
               </button>
             </div>
           ) : (

@@ -155,7 +155,7 @@ export default function WalletPage() {
                 onClick={openLogin}
                 className="inline-flex w-full sm:w-auto justify-center items-center rounded-full bg-gradient-to-r from-amber-500 to-amber-600 px-8 py-3 text-sm font-semibold text-white shadow-md shadow-amber-500/25 transition hover:from-amber-600 hover:to-amber-700"
               >
-                Log in
+                Sign in
               </button>
             </div>
           ) : (

@@ -71,7 +71,7 @@ function maybeHandleAuthExpired(res: Response, payload: unknown): boolean {
 
 /** @deprecated OTP endpoints removed from backend. */
 export async function sendOtp(_mobile: string, _countryCode: string) {
-  throw new Error("OTP login has been removed. Please use email/password.");
+  throw new Error("OTP sign in has been removed. Please use email/password.");
 }
 
 /** Single wallet ledger row from `GET /users/me` and verify-otp user payload. */
@@ -288,7 +288,7 @@ export async function loginWithEmail(email: string, password: string): Promise<A
 
 /** @deprecated OTP endpoints removed from backend. */
 export async function verifyOtp(_mobile: string, _countryCode: string, _otp: string): Promise<AuthResult> {
-  throw new Error("OTP login has been removed. Please use email/password.");
+  throw new Error("OTP sign in has been removed. Please use email/password.");
 }
 
 export async function redeemInviteCode(token: string, inviteCode: string): Promise<RedeemInviteCodeResult> {
@@ -532,7 +532,7 @@ export async function submitEnquiry(body: EnquiryBody) {
 
 export async function bookAppointment(body: BookAppointmentBody, token: string) {
   if (!token?.trim()) {
-    throw new Error("Please log in to book an appointment.");
+    throw new Error("Please sign in to book an appointment.");
   }
   const headers: Record<string, string> = {
     "Content-Type": "application/json",

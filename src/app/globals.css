@@ -174,15 +174,12 @@ body {
   animation: modalContentOut 0.25s ease-in forwards;
 }
 
-/* Premium modal input focus glow */
-@keyframes inputFocusGlow {
-  0%, 100% { box-shadow: 0 0 0 3px rgba(201, 162, 39, 0.15); }
-  50% { box-shadow: 0 0 0 4px rgba(201, 162, 39, 0.25); }
+
+/* Premium modal input focus (simplified) */
+.modal-input-focus:focus-within {
+  /* Removed glow animation */
 }
 
-.modal-input-focus:focus-within {
-  animation: inputFocusGlow 2s ease-in-out infinite;
-}
 
 /* Floating orb animation for branding panel */
 @keyframes floatOrb {

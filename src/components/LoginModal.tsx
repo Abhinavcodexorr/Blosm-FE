@@ -24,7 +24,7 @@ function isValidEmail(email: string): boolean {
 }
 
 const inputClass =
-  "w-full px-4 py-3.5 border border-gray-200/80 rounded-xl bg-gray-50/50 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-400 focus:bg-white text-base transition-all duration-200 placeholder:text-gray-400";
+  "w-full px-4 py-3.5 border border-gray-200/80 rounded-xl bg-gray-50/50 focus:outline-none focus:border-gray-400 focus:bg-white text-base transition-all duration-200 placeholder:text-gray-400";
 
 export default function LoginModal() {
   const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
@@ -351,7 +351,7 @@ export default function LoginModal() {
                   <p className="text-[13px] text-gray-400 mb-7 leading-relaxed">
                     {mode === "signup"
                       ? "Sign up to book appointments and manage your wallet."
-                      : "Log in with the email and password you used when signing up."}
+                      : "Sign in with the email and password you used when signing up."}
                   </p>
 
                   <form onSubmit={mode === "signup" ? handleSignup : handleLogin} className="space-y-4">
@@ -464,10 +464,10 @@ export default function LoginModal() {
                       {loading
                         ? mode === "signup"
                           ? "Creating account..."
-                          : "Logging in..."
+                          : "Signing in..."
                         : mode === "signup"
                           ? "Sign up"
-                          : "Log in"}
+                          : "Sign in"}
                     </button>
                   </form>
 
@@ -485,7 +485,7 @@ export default function LoginModal() {
                           onClick={() => switchMode("login")}
                           className="font-semibold text-amber-700 hover:text-amber-800 transition-colors underline decoration-amber-300/50 underline-offset-2 hover:decoration-amber-500"
                         >
-                          Log in
+                          Sign in
                         </button>
                       </>
                     ) : (

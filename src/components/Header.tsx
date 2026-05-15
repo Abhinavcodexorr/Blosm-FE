@@ -131,7 +131,7 @@ export default function Header() {
                 onClick={() => { openLogin(); setMobileMenuOpen(false); }}
                 className={`text-sm font-medium transition-colors ${linkClass}`}
               >
-                Login
+                Sign in
               </button>
             )}
             {profileOpen && token && (
@@ -185,7 +185,7 @@ export default function Header() {
                     }}
                     className="w-full py-2 text-sm font-medium text-rose-600 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
                   >
-                    Logout
+                    Sign out
                   </button>
                 </div>
               </div>
@@ -261,7 +261,7 @@ export default function Header() {
                     onClick={() => { logout(); setMobileMenuOpen(false); }}
                     className="block text-sm font-medium text-rose-600 hover:text-rose-700 w-full text-left"
                   >
-                    Logout
+                    Sign out
                   </button>
                 </li>
               </>
@@ -271,7 +271,7 @@ export default function Header() {
                   onClick={() => { openLogin(); setMobileMenuOpen(false); }}
                   className="block text-sm font-medium text-charcoal-600 hover:text-amber-800 w-full text-left"
                 >
-                  Login
+                  Sign in
                 </button>
               </li>
             )}

@@ -300,7 +300,7 @@ export default function AppointmentBookingPage() {
     if (!token) {
       setRedirectAfterLogin("/appointment");
       openLogin();
-      setError("Please log in to request an appointment.");
+      setError("Please sign in to request an appointment.");
       return;
     }
     const trimmedName = name.trim();

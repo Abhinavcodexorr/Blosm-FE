@@ -53,8 +53,8 @@ export default function PhoneCountryField({
   const wrapperToneClass =
     borderTone === "black"
       ? "border-black/80 focus-within:border-black hover:border-black"
-      : "border-gray-200 focus-within:border-amber-500 hover:border-gray-300";
-  const wrapperRingClass = borderTone === "black" ? "focus-within:ring-black/20" : "focus-within:ring-amber-500/35";
+      : "border-gray-200 focus-within:border-gray-400 hover:border-gray-300";
+  const wrapperRingClass = borderTone === "black" ? "focus-within:ring-black/5" : "focus-within:ring-transparent";
   const allOptions = getCountryDialOptions();
   const filteredOptions = lockToDialCode
     ? allOptions.filter((o) => o.dial === lockToDialCode)
@@ -70,7 +70,7 @@ export default function PhoneCountryField({
       <label htmlFor={id} className="block text-sm font-medium text-charcoal mb-2">
         {label}
       </label>
-      <div className={`flex ${r} border bg-white overflow-hidden shadow-sm transition-all focus-within:ring-2 ${wrapperToneClass} ${wrapperRingClass}`}>
+      <div className={`flex ${r} border bg-white overflow-hidden shadow-sm transition-all ${wrapperToneClass} ${wrapperRingClass}`}>
         <div className="relative shrink-0 border-r border-gray-200 bg-gradient-to-b from-rose-50/80 to-rose-50/30">
           <select
             value={forcedValue}
