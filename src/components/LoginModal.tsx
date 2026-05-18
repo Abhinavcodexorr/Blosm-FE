@@ -172,7 +172,7 @@ export default function LoginModal() {
     setLoading(true);
     try {
       const { token, user, isFirstLogin } = await registerUser({
-        name: trimmedName,
+        username: trimmedName,
         email: emailTrimmed,
         mobile: digits,
         countryCode: dialFromSelection(countrySelect),
