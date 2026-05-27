@@ -3,7 +3,14 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useLoginModal } from "@/context/LoginModalContext";
-import { getProfile, loginWithEmail, redeemInviteCode, registerUser } from "@/lib/api";
+import {
+  getProfile,
+  redeemInviteCode,
+  sendOtp,
+  verifyOtp,
+  updateMyProfile,
+  type PublicUser,
+} from "@/lib/api";
 import PhoneCountryField from "@/components/PhoneCountryField";
 import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 import {
@@ -15,25 +22,21 @@ import {
 import { ENQUIRY_THANKS_PENDING_LOGIN_KEY } from "@/lib/enquiryLoginRedirect";
 
 const REDIRECT_KEY = "blosm_redirect_after_login";
-const MIN_PASSWORD_LEN = 6;
 
-type AuthMode = "signup" | "login" | "invite";
+type AuthMode = "login" | "invite";
 
-function isValidEmail(email: string): boolean {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+function profileNeedsDisplayName(user: { username?: string; name?: string | null }): boolean {
+  return !(user.username?.trim() || user.name?.trim());
 }
 
 const inputClass =
   "w-full px-4 py-3.5 border border-gray-200/80 rounded-xl bg-gray-50/50 focus:outline-none focus:border-gray-400 focus:bg-white text-base transition-all duration-200 placeholder:text-gray-400";
 
 export default function LoginModal() {
-  const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin } = useLoginModal();
+  const { isOpen, closeLogin, setAuth, redirectAfterLogin, setRedirectAfterLogin, token: sessionToken } = useLoginModal();
   const router = useRouter();
-  const [mode, setMode] = useState<AuthMode>("signup");
+  const [mode, setMode] = useState<AuthMode>("login");
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [mobile, setMobile] = useState("");
   const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
   const [loading, setLoading] = useState(false);
@@ -45,6 +48,13 @@ export default function LoginModal() {
   const [pendingUserId, setPendingUserId] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [otpStep, setOtpStep] = useState<"input" | "otp" | "name">("input");
+  const [otpCode, setOtpCode] = useState("");
+  /** Carries server `isFirstLogin` across optional name-after-phone screen. */
+  const [phoneAuthExtras, setPhoneAuthExtras] = useState<{ isFirstLogin: boolean } | null>(null);
+  const [resendIn, setResendIn] = useState(0);
+  /** Token from last successful phone OTP verify (avoids stale context before re-render when saving name). */
+  const phoneLoginTokenRef = useRef<string | null>(null);
   const scrollPosRef = useRef(0);
   const skipRestoreScrollRef = useRef(false);
 
@@ -87,12 +97,17 @@ export default function LoginModal() {
     };
   }, [mounted, isOpen]);
 
+  useEffect(() => {
+    if (otpStep !== "otp" || resendIn <= 0) return;
+    const t = window.setInterval(() => {
+      setResendIn((s) => (s <= 1 ? 0 : s - 1));
+    }, 1000);
+    return () => window.clearInterval(t);
+  }, [otpStep, resendIn]);
+
   const resetForm = () => {
-    setMode("signup");
+    setMode("login");
     setName("");
-    setEmail("");
-    setPassword("");
-    setShowPassword(false);
     setMobile("");
     setCountrySelect(getDefaultCountrySelectValue());
     setInviteCode("");
@@ -100,6 +115,11 @@ export default function LoginModal() {
     setInviteAction(null);
     setPendingToken(null);
     setPendingUserId(null);
+    setOtpStep("input");
+    setOtpCode("");
+    setPhoneAuthExtras(null);
+    setResendIn(0);
+    phoneLoginTokenRef.current = null;
     setError("");
   };
 
@@ -145,73 +165,107 @@ export default function LoginModal() {
     return false;
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    const trimmedName = name.trim();
-    const emailTrimmed = email.trim();
-    const digits = sanitizeMobileDigits(mobile);
+  const maybeShowNameStepOrFinish = (user: PublicUser) => {
+    if (profileNeedsDisplayName(user)) {
+      setOtpStep("name");
+      return;
+    }
+    setPhoneAuthExtras(null);
+    setOtpStep("input");
+    navigateAfterLoginSuccess();
+  };
 
-    if (!trimmedName) {
-      setError("Please enter your name.");
+  const finishAuthOrContinue = (token: string, user: PublicUser, isFirstLogin: boolean) => {
+    setAuth(token, user);
+    setPhoneAuthExtras({ isFirstLogin });
+    phoneLoginTokenRef.current = token;
+    setName("");
+    if (maybeShowInviteStep(token, user._id, isFirstLogin)) {
       return;
     }
-    if (!isValidEmail(emailTrimmed)) {
-      setError("Please enter a valid email address.");
-      return;
-    }
+    maybeShowNameStepOrFinish(user);
+  };
+
+  const phoneLoginDigits = () => sanitizeMobileDigits(mobile);
+
+  const sendVerificationCode = async () => {
+    setError("");
+    const digits = phoneLoginDigits();
+
     if (!isValidMobileDigits(digits)) {
       setError(`Enter ${MOBILE_DIGITS_MIN}–${MOBILE_DIGITS_LEN} digits for your mobile number.`);
-      return;
-    }
-    if (password.length < MIN_PASSWORD_LEN) {
-      setError(`Password must be at least ${MIN_PASSWORD_LEN} characters.`);
       return;
     }
 
     setLoading(true);
     try {
-      const { token, user, isFirstLogin } = await registerUser({
-        username: trimmedName,
-        email: emailTrimmed,
+      await sendOtp({
+        purpose: "login",
         mobile: digits,
         countryCode: dialFromSelection(countrySelect),
-        password,
       });
-      setAuth(token, user);
-      if (!maybeShowInviteStep(token, user._id, isFirstLogin)) {
-        navigateAfterLoginSuccess();
-      }
+      setOtpStep("otp");
+      setOtpCode("");
+      setResendIn(45);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create account");
+      setError(err instanceof Error ? err.message : "Failed to send verification code");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await sendVerificationCode();
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    const emailTrimmed = email.trim();
-
-    if (!isValidEmail(emailTrimmed)) {
-      setError("Please enter a valid email address.");
+    const code = otpCode.replace(/\D/g, "");
+    if (code.length < 4 || code.length > 8) {
+      setError("Enter the verification code from your SMS.");
       return;
     }
-    if (!password) {
-      setError("Please enter your password.");
-      return;
-    }
-
     setLoading(true);
     try {
-      const { token, user, isFirstLogin } = await loginWithEmail(emailTrimmed, password);
-      setAuth(token, user);
-      if (!maybeShowInviteStep(token, user._id, isFirstLogin)) {
-        navigateAfterLoginSuccess();
-      }
+      const result = await verifyOtp({
+        purpose: "login",
+        mobile: phoneLoginDigits(),
+        countryCode: dialFromSelection(countrySelect),
+        otp: code,
+      });
+      finishAuthOrContinue(result.token, result.user, result.isFirstLogin);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Invalid email or password");
+      setError(err instanceof Error ? err.message : "Invalid or expired code");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleNameAfterLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setError("Please enter your name.");
+      return;
+    }
+    const t = phoneLoginTokenRef.current ?? sessionToken;
+    if (!t) {
+      setError("Session expired. Please sign in again.");
+      setOtpStep("input");
+      return;
+    }
+    setLoading(true);
+    try {
+      const updated = await updateMyProfile(t, { name: trimmed });
+      setAuth(t, updated);
+      setPhoneAuthExtras(null);
+      setOtpStep("input");
+      navigateAfterLoginSuccess();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not save your name.");
     } finally {
       setLoading(false);
     }
@@ -221,13 +275,24 @@ export default function LoginModal() {
     if (typeof window !== "undefined") {
       localStorage.setItem(inviteSeenStorageKey(userId), "1");
     }
+    setMode("login");
+    setPendingToken(null);
+    setPendingUserId(null);
+    setInviteCode("");
+    setInviteMessage("");
+    setError("");
+
+    let user: PublicUser | null = null;
     try {
       const fresh = await getProfile(token);
       setAuth(token, fresh);
+      user = fresh;
     } catch {
       // Keep auth payload if profile refresh fails.
     }
-    navigateAfterLoginSuccess();
+
+    setOtpStep("name");
+    setName(user?.name?.trim() || user?.username?.trim() || "");
   };
 
   const handleSkipInvite = async () => {
@@ -280,13 +345,6 @@ export default function LoginModal() {
     }
   };
 
-  const switchMode = (next: "signup" | "login") => {
-    setMode(next);
-    setError("");
-    setPassword("");
-    setShowPassword(false);
-  };
-
   if (!mounted) return null;
 
   return (
@@ -295,7 +353,7 @@ export default function LoginModal() {
         className={`bg-white rounded-[28px] shadow-[0_32px_80px_-12px_rgba(0,0,0,0.3)] w-full ${mode === "invite" ? "max-w-xl" : "max-w-[900px]"} overflow-hidden ring-1 ring-white/20 ${closing ? "animate-modal-content-out" : "animate-modal-content"}`}
         onClick={(e) => e.stopPropagation()}
       >
-        {(mode === "signup" || mode === "login") && (
+        {mode === "login" && (
           <div className="relative">
             <button
               type="button"
@@ -343,25 +401,39 @@ export default function LoginModal() {
               </div>
 
               {/* Form panel */}
-              <div className="md:w-[58%] p-8 md:p-10 md:pl-12 flex flex-col justify-center bg-white pt-14 md:pt-10">
-                <div key={mode} className="animate-slide-in">
-                  <h3 className="font-display text-[1.65rem] font-light text-charcoal mb-1.5 tracking-tight">
-                    {mode === "signup" ? "Create your account" : "Welcome back"}
-                  </h3>
-                  <p className="text-[13px] text-gray-400 mb-7 leading-relaxed">
-                    {mode === "signup"
-                      ? "Sign up to book appointments and manage your wallet."
-                      : "Sign in with the email and password you used when signing up."}
-                  </p>
+              <div className="md:w-[58%] flex flex-col justify-center bg-gradient-to-br from-[#fcfaf6] via-white to-amber-50/25 p-8 md:p-10 md:pl-12 pt-14 md:pt-10">
+                <div key={`${mode}-${otpStep}`} className="animate-slide-in mx-auto w-full max-w-[420px]">
+                  {otpStep === "input" ? (
+                    <div className="mb-8">
+                      <h3 className="font-display text-[1.85rem] font-semibold leading-tight tracking-tight text-black sm:text-[2rem]">
+                        SignIn{" "}
+                        <span className="px-1.5 text-[1.35rem] font-normal text-gray-300 sm:text-[1.5rem]">or</span>{" "}
+                        SignUp
+                      </h3>
+                      <div className="mt-4 h-[3px] w-14 rounded-full bg-gradient-to-r from-amber-500 via-amber-400 to-amber-200/40" />
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="mb-1.5 font-display text-[1.65rem] font-semibold tracking-tight text-black">
+                        {otpStep === "name" ? "What should we call you?" : "Verify your number"}
+                      </h3>
+                      <p className="mb-7 text-[13px] leading-relaxed text-gray-500">
+                        {otpStep === "name"
+                          ? "Add your name so we can personalise your bookings."
+                          : "We sent a code to your phone. Enter it below to continue."}
+                      </p>
+                    </>
+                  )}
 
-                  <form onSubmit={mode === "signup" ? handleSignup : handleLogin} className="space-y-4">
-                    {mode === "signup" && (
+                  <div className="rounded-2xl border border-amber-100/60 bg-white/90 p-5 shadow-[0_12px_40px_-24px_rgba(0,0,0,0.18)] ring-1 ring-black/[0.03] sm:p-6">
+                  {otpStep === "name" ? (
+                    <form onSubmit={handleNameAfterLogin} className="space-y-4">
                       <div className="modal-input-focus rounded-xl">
-                        <label htmlFor="signup-name" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                        <label htmlFor="login-name" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
                           Name
                         </label>
                         <input
-                          id="signup-name"
+                          id="login-name"
                           type="text"
                           autoComplete="name"
                           value={name}
@@ -370,26 +442,24 @@ export default function LoginModal() {
                           className={inputClass}
                         />
                       </div>
-                    )}
-
-                    <div className="modal-input-focus rounded-xl">
-                      <label htmlFor="auth-email" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                        Email
-                      </label>
-                      <input
-                        id="auth-email"
-                        type="email"
-                        autoComplete={mode === "signup" ? "email" : "username"}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="you@example.com"
-                        className={inputClass}
-                      />
-                    </div>
-
-                    {mode === "signup" && (
+                      {error && (
+                        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-50/80 border border-red-100">
+                          <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <p className="text-sm text-red-600">{error}</p>
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 btn-gold-shimmer disabled:opacity-70 disabled:animate-none text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-amber-800/15 hover:shadow-xl hover:shadow-amber-800/20 hover:-translate-y-[1px] active:translate-y-0 mt-1"
+                      >
+                        {loading ? "Saving..." : "Continue"}
+                      </button>
+                    </form>
+                  ) : otpStep === "input" ? (
+                    <form onSubmit={handleSendOtp} className="space-y-5">
                       <PhoneCountryField
-                        id="signup-mobile"
+                        id="login-mobile"
                         label="Mobile number"
                         mobile={mobile}
                         countrySelect={countrySelect}
@@ -397,111 +467,83 @@ export default function LoginModal() {
                         onCountryChange={setCountrySelect}
                         rounded="xl"
                         placeholder="e.g. 410 123 456"
-                        labelClassName="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5"
+                        labelClassName="block text-xs font-semibold uppercase tracking-wider text-charcoal mb-2"
                       />
-                    )}
-
-                    <div className="modal-input-focus rounded-xl">
-                      <label htmlFor="auth-password" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                        Password
-                      </label>
-                      <div className="relative">
+                      {error && (
+                        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-50/80 border border-red-100">
+                          <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <p className="text-sm text-red-600">{error}</p>
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 btn-gold-shimmer disabled:opacity-70 disabled:animate-none text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-amber-800/15 hover:shadow-xl hover:shadow-amber-800/20 hover:-translate-y-[1px] active:translate-y-0 mt-1"
+                      >
+                        {loading ? "Sending..." : "Continue"}
+                      </button>
+                    </form>
+                  ) : otpStep === "otp" ? (
+                    <form onSubmit={handleVerifyOtp} className="space-y-5">
+                      <div className="rounded-xl border border-amber-100/70 bg-amber-50/40 px-4 py-3 text-[13px] leading-relaxed text-gray-600">
+                        Code sent to{" "}
+                        <span className="font-semibold text-charcoal">
+                          {dialFromSelection(countrySelect)} ···{phoneLoginDigits().slice(-4) || phoneLoginDigits()}
+                        </span>
+                      </div>
+                      <div className="modal-input-focus rounded-xl">
+                        <label htmlFor="login-otp" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                          Verification code
+                        </label>
                         <input
-                          id="auth-password"
-                          type={showPassword ? "text" : "password"}
-                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                          value={password}
-                          onChange={(e) => setPassword(e.target.value)}
-                          placeholder={mode === "signup" ? "At least 6 characters" : "Your password"}
-                          className={`${inputClass} pr-12`}
+                          id="login-otp"
+                          type="text"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          maxLength={8}
+                          value={otpCode}
+                          onChange={(e) => setOtpCode(sanitizeMobileDigits(e.target.value))}
+                          placeholder="Enter code"
+                          className={`${inputClass} text-center tracking-[0.35em]`}
                         />
+                      </div>
+                      {error && (
+                        <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-50/80 border border-red-100">
+                          <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          <p className="text-sm text-red-600">{error}</p>
+                        </div>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-4 btn-gold-shimmer disabled:opacity-70 disabled:animate-none text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-amber-800/15 hover:shadow-xl hover:shadow-amber-800/20 hover:-translate-y-[1px] active:translate-y-0 mt-1"
+                      >
+                        {loading ? "Verifying..." : "Continue"}
+                      </button>
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
                         <button
                           type="button"
-                          onClick={() => setShowPassword((v) => !v)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 text-gray-400 hover:text-charcoal rounded-lg transition-colors"
-                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          disabled={loading || resendIn > 0}
+                          onClick={() => void sendVerificationCode()}
+                          className="text-sm font-semibold text-amber-700 hover:text-amber-800 disabled:opacity-50 disabled:pointer-events-none text-left transition-colors"
                         >
-                          {showPassword ? (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.75}
-                                d="M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88"
-                              />
-                            </svg>
-                          ) : (
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.75}
-                                d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"
-                              />
-                              <path
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                strokeWidth={1.75}
-                                d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
-                              />
-                            </svg>
-                          )}
+                          {resendIn > 0 ? `Resend code in ${resendIn}s` : "Resend code"}
+                        </button>
+                        <button
+                          type="button"
+                          className="text-sm text-gray-500 hover:text-amber-800 transition-colors text-left sm:text-right"
+                          onClick={() => {
+                            setOtpStep("input");
+                            setOtpCode("");
+                            setError("");
+                          }}
+                        >
+                          Use a different number
                         </button>
                       </div>
-                    </div>
-
-                    {error && (
-                      <div className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-red-50/80 border border-red-100">
-                        <svg className="w-4 h-4 text-red-500 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                        <p className="text-sm text-red-600">{error}</p>
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-4 btn-gold-shimmer disabled:opacity-70 disabled:animate-none text-white font-semibold rounded-xl transition-all duration-300 shadow-lg shadow-amber-800/15 hover:shadow-xl hover:shadow-amber-800/20 hover:-translate-y-[1px] active:translate-y-0 mt-1"
-                    >
-                      {loading
-                        ? mode === "signup"
-                          ? "Creating account..."
-                          : "Signing in..."
-                        : mode === "signup"
-                          ? "Sign up"
-                          : "Sign in"}
-                    </button>
-                  </form>
-
-                  <div className="relative my-6">
-                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-100" /></div>
-                    <div className="relative flex justify-center"><span className="bg-white px-4 text-xs text-gray-400">or</span></div>
+                    </form>
+                  ) : null}
                   </div>
-
-                  <p className="text-sm text-center text-gray-500">
-                    {mode === "signup" ? (
-                      <>
-                        Already have an account?{" "}
-                        <button
-                          type="button"
-                          onClick={() => switchMode("login")}
-                          className="font-semibold text-amber-700 hover:text-amber-800 transition-colors underline decoration-amber-300/50 underline-offset-2 hover:decoration-amber-500"
-                        >
-                          Sign in
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        Don&apos;t have an account?{" "}
-                        <button
-                          type="button"
-                          onClick={() => switchMode("signup")}
-                          className="font-semibold text-amber-700 hover:text-amber-800 transition-colors underline decoration-amber-300/50 underline-offset-2 hover:decoration-amber-500"
-                        >
-                          Sign up
-                        </button>
-                      </>
-                    )}
-                  </p>
                 </div>
               </div>
             </div>

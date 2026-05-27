@@ -6,6 +6,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { useLoginModal } from "@/context/LoginModalContext";
 import { getMyBookingsList, type MyAppointment } from "@/lib/api";
+import { SHOW_SERVICE_PRICING } from "@/lib/config";
 import { formatAud } from "@/lib/formatCurrency";
 import { formatTimeToAmPm } from "@/lib/timeDisplay";
 
@@ -41,7 +42,8 @@ function groupedServiceSelections(
         : typeof r.price === "string"
           ? Number(r.price)
           : Number.NaN;
-    const priceLabel = Number.isFinite(parsedPrice) && parsedPrice > 0 ? formatAud(parsedPrice) : "";
+    const priceLabel =
+      SHOW_SERVICE_PRICING && Number.isFinite(parsedPrice) && parsedPrice > 0 ? formatAud(parsedPrice) : "";
     const meta = [durationLabel, priceLabel].filter(Boolean).join(" · ");
 
     const list = out.get(heading) ?? [];
@@ -80,9 +82,9 @@ export default function AppointmentsPage() {
   }, [token]);
 
   return (
-    <main className="min-h-screen">
+    <main className="min-h-screen flex flex-col">
       <Header />
-      <section className="pt-28 pb-20 md:pt-32 md:pb-24 bg-gradient-to-b from-rose-50/30 via-white to-amber-50/20">
+      <section className="flex-1 pt-28 pb-20 md:pt-32 md:pb-24 bg-gradient-to-b from-rose-50/30 via-white to-amber-50/20">
         <div className="max-w-3xl mx-auto px-6">
           {!token ? (
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8 md:p-10 text-center">
@@ -134,7 +136,7 @@ export default function AppointmentsPage() {
                             {apt.time ? ` · ${formatTimeToAmPm(apt.time)}` : ""}
                             {typeof apt.duration === "number" ? ` · ${apt.duration} mins` : ""}
                           </p>
-                          {formatAud(apt.price) ? (
+                          {SHOW_SERVICE_PRICING && formatAud(apt.price) ? (
                             <p className="mt-2 text-sm font-semibold tabular-nums text-[#8B6914]">
                               {formatAud(apt.price)}
                             </p>

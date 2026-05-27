@@ -6,6 +6,7 @@ import ScrollReveal from "./ScrollReveal";
 import LazyImage from "./LazyImage";
 import { getServices } from "@/services/api";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { SHOW_SERVICE_PRICING } from "@/lib/config";
 import { formatAud } from "@/lib/formatCurrency";
 
 const FALLBACK_IMAGES: Record<string, string> = {
@@ -104,7 +105,7 @@ export default function Services({ limit }: ServicesProps) {
                     <h3 className="font-display text-2xl font-medium text-charcoal group-hover:text-amber-800 transition-colors">
                       {service.title}
                     </h3>
-                    {formatAud(service.price) ? (
+                    {SHOW_SERVICE_PRICING && formatAud(service.price) ? (
                       <span className="text-base font-semibold text-[#8B6914] tabular-nums">{formatAud(service.price)}</span>
                     ) : null}
                   </div>

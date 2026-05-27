@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import LazyImage from "@/components/LazyImage";
 import { getCategories } from "@/services/api";
 import { useLoginModal } from "@/context/LoginModalContext";
+import { SHOW_SERVICE_PRICING } from "@/lib/config";
 import { formatAud } from "@/lib/formatCurrency";
 
 const FALLBACK_IMAGE = "https://images.unsplash.com/photo-1560066984-138dadb4c035?w=800&q=85";
@@ -65,7 +66,7 @@ export default function ServicesPage() {
                     <h2 className="font-display text-2xl md:text-3xl font-light text-charcoal">
                       {service.name}
                     </h2>
-                    {formatAud(service.price) ? (
+                    {SHOW_SERVICE_PRICING && formatAud(service.price) ? (
                       <p className="text-lg md:text-xl font-semibold text-[#8B6914] tabular-nums shrink-0">
                         {formatAud(service.price)}
                       </p>

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "@/lib/config";
+import { API_BASE_URL, SHOW_SERVICE_PRICING } from "@/lib/config";
 
 /** Priced line item under a subheading (booking menu). */
 export type ApiBookingServiceItem = {
@@ -54,6 +54,35 @@ function serviceDisplayTitle(s: ApiService): string {
   return (s.heading ?? s.title ?? "").trim() || "Service";
 }
 
+/**
+ * Menu line labels for public services pages — item names from `subheadings`, never legacy `items` strings with prices.
+ * If the same name appears more than once, duration is appended so variants stay distinct (e.g. two "Oil Massage" rows).
+ */
+function listingItemNamesFromService(s: ApiService): string[] {
+  const subs = s.subheadings;
+  if (!subs?.length) return [];
+
+  const nameCounts = new Map<string, number>();
+  for (const sub of subs) {
+    for (const item of sub.items ?? []) {
+      const name = item?.name?.trim();
+      if (name) nameCounts.set(name, (nameCounts.get(name) ?? 0) + 1);
+    }
+  }
+
+  const out: string[] = [];
+  for (const sub of subs) {
+    for (const item of sub.items ?? []) {
+      const name = item?.name?.trim();
+      if (!name) continue;
+      const dur = formatServiceItemDurationLabel(item);
+      const label = (nameCounts.get(name) ?? 0) > 1 && dur ? `${name} (${dur})` : name;
+      if (!out.includes(label)) out.push(label);
+    }
+  }
+  return out;
+}
+
 export async function getServices(): Promise<
   { title: string; description: string; image: string; tag?: string | null; items?: string[] }[]
 > {
@@ -65,7 +94,7 @@ export async function getServices(): Promise<
       description: s.description,
       image: s.image || "",
       tag: null as string | null,
-      items: s.items || [],
+      items: listingItemNamesFromService(s),
     }));
 }
 
@@ -81,7 +110,7 @@ export async function getCategories(): Promise<
       description: s.description,
       image: s.image || "",
       alt: s.alt || serviceDisplayTitle(s),
-      items: s.items || [],
+      items: listingItemNamesFromService(s),
     }));
 }
 
@@ -91,14 +120,8 @@ export async function getServiceTitles(): Promise<string[]> {
   for (const s of data) {
     if (s.isActive !== false) {
       titles.push(serviceDisplayTitle(s));
-      if (s.items?.length) titles.push(...s.items);
-      if (s.subheadings?.length) {
-        for (const sub of s.subheadings) {
-          for (const it of sub.items ?? []) {
-            const n = it?.name?.trim();
-            if (n) titles.push(n);
-          }
-        }
+      for (const name of listingItemNamesFromService(s)) {
+        titles.push(name);
       }
     }
   }
@@ -222,10 +245,10 @@ export function parseServiceItemDurationMinutes(item: ApiBookingServiceItem): nu
   return 0;
 }
 
-/** Duration · price for booking UI rows (skips empty parts). */
+/** Duration · price for booking UI rows (skips empty parts). Price omitted when `SHOW_SERVICE_PRICING` is false. */
 export function formatBookingLineMeta(durationLabel: string, priceFormatted: string): string {
   const dur = (durationLabel ?? "").trim();
-  const price = (priceFormatted ?? "").trim();
+  const price = SHOW_SERVICE_PRICING ? (priceFormatted ?? "").trim() : "";
   const parts = [dur || null, price || null].filter(Boolean) as string[];
   return parts.length ? parts.join(" · ") : "—";
 }

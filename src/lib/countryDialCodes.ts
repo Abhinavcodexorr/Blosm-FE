@@ -51,6 +51,19 @@ export function getDefaultCountrySelectValue(): string {
   return opts.find((o) => o.value.startsWith("+61__AU__"))?.value ?? opts[0]?.value ?? "+61__AU__61";
 }
 
+/** Map API/store dial code (e.g. `+61`) to a `<select>` option value; prefers Australia for +61. */
+export function countrySelectFromDialCode(countryCode: string | null | undefined): string {
+  const dial = countryCode?.trim();
+  if (!dial) return getDefaultCountrySelectValue();
+  const normalized = dial.startsWith("+") ? dial : `+${dial}`;
+  const opts = getCountryDialOptions();
+  if (normalized === "+61") {
+    return opts.find((o) => o.value.startsWith("+61__AU__"))?.value ?? getDefaultCountrySelectValue();
+  }
+  const match = opts.find((o) => o.dial === normalized);
+  return match?.value ?? getDefaultCountrySelectValue();
+}
+
 /** Legacy alias — use `getDefaultCountrySelectValue()` in new code. */
 export const DEFAULT_COUNTRY_SELECT = getDefaultCountrySelectValue();
 

@@ -16,9 +16,17 @@ const dmSans = DM_Sans({
   display: 'swap',
 })
 
+const faviconUrl =
+  'https://assets.zyrosite.com/cdn-cgi/image/format=auto,w=375,fit=crop,q=95/YNq2W1bJ9MU6Jxaq/1929c249-b4b5-4513-925a-b5fb2bc6ff47-dOqDKVp1vPTlrj9q.png'
+
 export const metadata: Metadata = {
   title: 'Blosm Hair & Beauty | Women-Only Salon Perth',
   description: "Perth's premier women-only hair and beauty salon. Experience luxury and elegance in a private, welcoming space designed for you.",
+  icons: {
+    icon: faviconUrl,
+    shortcut: faviconUrl,
+    apple: faviconUrl,
+  },
 }
 
 export default function RootLayout({

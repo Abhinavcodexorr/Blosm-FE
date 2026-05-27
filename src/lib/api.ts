@@ -69,9 +69,54 @@ function maybeHandleAuthExpired(res: Response, payload: unknown): boolean {
   return false;
 }
 
-/** @deprecated OTP endpoints removed from backend. */
-export async function sendOtp(_mobile: string, _countryCode: string) {
-  throw new Error("OTP sign in has been removed. Please use email/password.");
+export type OtpPurpose = "login" | "signup";
+
+export type SendOtpInput =
+  | { purpose: "signup"; mobile: string; countryCode: string; email: string }
+  | { purpose: "login"; mobile: string; countryCode: string }
+  | { purpose: "login"; email: string };
+
+function buildSendOtpBody(input: SendOtpInput): Record<string, string> {
+  if (input.purpose === "signup") {
+    return {
+      mobile: input.mobile,
+      countryCode: input.countryCode,
+      email: input.email.trim(),
+      purpose: "signup",
+    };
+  }
+  if ("email" in input) {
+    return { email: input.email.trim(), purpose: "login" };
+  }
+  return {
+    mobile: input.mobile,
+    countryCode: input.countryCode,
+    purpose: "login",
+  };
+}
+
+/**
+ * Sends a login or signup OTP.
+ * POST /api/v1/auth/send-otp
+ */
+export async function sendOtp(input: SendOtpInput): Promise<void> {
+  const body = buildSendOtpBody(input);
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/send-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (
+    !res.ok ||
+    (json &&
+      typeof json === "object" &&
+      "success" in json &&
+      (json as { success?: boolean }).success === false)
+  ) {
+    throw new Error(authErrorMessage(json, "Failed to send verification code"));
+  }
 }
 
 /** Single wallet ledger row from `GET /users/me` and verify-otp user payload. */
@@ -286,9 +331,134 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   return parseAuthEnvelope(json);
 }
 
-/** @deprecated OTP endpoints removed from backend. */
-export async function verifyOtp(_mobile: string, _countryCode: string, _otp: string): Promise<AuthResult> {
-  throw new Error("OTP sign in has been removed. Please use email/password.");
+export type VerifyOtpInput =
+  | { purpose: "signup"; mobile: string; countryCode: string; email: string; otp: string }
+  | { purpose: "login"; mobile: string; countryCode: string; otp: string }
+  | { purpose: "login"; email: string; otp: string };
+
+function buildVerifyOtpBody(input: VerifyOtpInput): Record<string, string> {
+  const cleaned = input.otp.replace(/\s/g, "");
+  if (input.purpose === "signup") {
+    return {
+      mobile: input.mobile,
+      countryCode: input.countryCode,
+      email: input.email.trim(),
+      otp: cleaned,
+      purpose: "signup",
+    };
+  }
+  if ("email" in input) {
+    return { email: input.email.trim(), otp: cleaned, purpose: "login" };
+  }
+  return {
+    mobile: input.mobile,
+    countryCode: input.countryCode,
+    otp: cleaned,
+    purpose: "login",
+  };
+}
+
+/**
+ * Completes OTP sign-in or signup — returns bearer token + public user envelope.
+ * POST /api/v1/auth/verify-otp
+ */
+export async function verifyOtp(input: VerifyOtpInput): Promise<AuthResult> {
+  const body = buildVerifyOtpBody(input);
+  const res = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (
+    !res.ok ||
+    (json &&
+      typeof json === "object" &&
+      "success" in json &&
+      (json as { success?: boolean }).success === false)
+  ) {
+    throw new Error(authErrorMessage(json, "Invalid or expired code"));
+  }
+  return parseAuthEnvelope(json);
+}
+
+export type UpdateMyProfileBody = {
+  name?: string;
+  email?: string;
+  /** Digits only. Must be sent together with `countryCode`. */
+  mobile?: string;
+  countryCode?: string;
+};
+
+function parseUserFromApiPayload(json: unknown): PublicUser {
+  if (!json || typeof json !== "object") {
+    throw new Error("Invalid profile response");
+  }
+  const root = json as Record<string, unknown>;
+  const payload = root.data !== undefined ? root.data : json;
+  let userPayload: unknown = payload;
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "user" in (payload as object) &&
+    (payload as { user: unknown }).user != null
+  ) {
+    userPayload = (payload as { user: unknown }).user;
+  } else if (root.user != null && payload === root) {
+    userPayload = root.user;
+  }
+  return parsePublicUser(userPayload);
+}
+
+/**
+ * PATCH /api/v1/users/me — partial profile update.
+ * Send only fields to change: `name`, `email`, `mobile` + `countryCode` (pair).
+ */
+export async function updateMyProfile(
+  token: string,
+  body: UpdateMyProfileBody
+): Promise<PublicUser> {
+  const patch: Record<string, string> = {};
+  if (body.name != null && body.name.trim() !== "") patch.name = body.name.trim();
+  if (body.email != null && body.email.trim() !== "") patch.email = body.email.trim();
+  if (body.mobile != null) patch.mobile = body.mobile.replace(/\D/g, "");
+  if (body.countryCode != null && body.countryCode.trim() !== "") {
+    patch.countryCode = body.countryCode.trim();
+  }
+
+  const hasMobile = "mobile" in patch;
+  const hasCountry = "countryCode" in patch;
+  if (hasMobile !== hasCountry) {
+    throw new Error("Mobile and country code must be sent together.");
+  }
+  if (Object.keys(patch).length === 0) {
+    throw new Error("Enter at least one field to update.");
+  }
+
+  const res = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(patch),
+    credentials: "include",
+  });
+  const json = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    maybeHandleAuthExpired(res, json);
+    throw new Error(authErrorMessage(json, "Failed to update profile"));
+  }
+  if (json && typeof json === "object" && (json as { success?: boolean }).success === false) {
+    maybeHandleAuthExpired(res, json);
+    throw new Error(authErrorMessage(json, "Failed to update profile"));
+  }
+  try {
+    return parseUserFromApiPayload(json);
+  } catch {
+    return getProfile(token);
+  }
 }
 
 export async function redeemInviteCode(token: string, inviteCode: string): Promise<RedeemInviteCodeResult> {
@@ -344,23 +514,16 @@ export async function getProfile(token: string): Promise<PublicUser> {
     headers: { Authorization: `Bearer ${token}` },
     credentials: "include",
   });
-  const json = await res.json();
+  const json = await res.json().catch(() => ({}));
   if (!res.ok) {
     maybeHandleAuthExpired(res, json);
-    throw new Error(json.error || json.message || "Failed to fetch profile");
+    throw new Error(authErrorMessage(json, "Failed to fetch profile"));
   }
-  if (json.success === false) {
+  if (json && typeof json === "object" && (json as { success?: boolean }).success === false) {
     maybeHandleAuthExpired(res, json);
-    throw new Error(json.message || json.error?.message || "Failed to fetch profile");
+    throw new Error(authErrorMessage(json, "Failed to fetch profile"));
   }
-  const payload = json.data !== undefined ? json.data : json;
-  let userPayload: unknown = payload;
-  if (payload && typeof payload === "object" && "user" in payload && (payload as { user: unknown }).user != null) {
-    userPayload = (payload as { user: unknown }).user;
-  } else if (json.user != null && payload === json) {
-    userPayload = json.user;
-  }
-  return parsePublicUser(userPayload);
+  return parseUserFromApiPayload(json);
 }
 
 /** One row inside `serviceSelections` (multi-service booking). */
@@ -382,7 +545,7 @@ export type AppointmentGroupedService = {
  */
 export type BookAppointmentBody = {
   name: string;
-  email: string;
+  email?: string;
   mobile: string;
   countryCode?: string;
   date: string; // YYYY-MM-DD

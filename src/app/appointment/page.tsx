@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import PhoneCountryField from "@/components/PhoneCountryField";
@@ -13,10 +13,12 @@ import {
 } from "@/services/api";
 import {
   bookAppointment,
+  getProfile,
   getSalonAvailability,
   getAppointmentsBookedSlots,
   type BookedSlot,
   type BookAppointmentBody,
+  type PublicUser,
   type SalonAvailability,
 } from "@/lib/api";
 import {
@@ -37,6 +39,7 @@ import {
 } from "@/lib/mobileInput";
 import { dialFromSelection, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 import { SALON_BOOKING_ADDRESS, SALON_BOOKING_NAME } from "@/lib/salonVenue";
+import { SHOW_SERVICE_PRICING } from "@/lib/config";
 import Link from "next/link";
 
 type BookingStep = "services" | "datetime" | "details";
@@ -59,11 +62,20 @@ function formatBookingDateLong(ymd: string): string {
   return [weekday, day, month, year].filter(Boolean).join(" ");
 }
 
+function applyProfileToBookingDetails(profile: PublicUser) {
+  const displayName = profile.name?.trim() || profile.username?.trim() || "";
+  return {
+    name: displayName,
+    email: profile.email?.trim() ?? "",
+    mobile: profile.mobile?.trim() ? sanitizeMobileDigits(profile.mobile) : "",
+  };
+}
+
 export default function AppointmentBookingPage() {
-  const { token, authReady, openLogin, setRedirectAfterLogin } = useLoginModal();
+  const { token, authReady, user, openLogin, setRedirectAfterLogin } = useLoginModal();
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
-  const [countrySelect, setCountrySelect] = useState(getDefaultCountrySelectValue);
+  const [countrySelect, setCountrySelect] = useState(() => getDefaultCountrySelectValue());
   const [email, setEmail] = useState("");
   const [notes, setNotes] = useState("");
   const [serviceCategories, setServiceCategories] = useState<BookingServiceCategory[]>([]);
@@ -82,6 +94,7 @@ export default function AppointmentBookingPage() {
   const [error, setError] = useState("");
   const [serviceTitle, setServiceTitle] = useState("");
   const [step, setStep] = useState<BookingStep>("services");
+  const detailsProfileLoadedRef = useRef(false);
 
   useEffect(() => {
     setClockTick((n) => n + 1);
@@ -90,8 +103,9 @@ export default function AppointmentBookingPage() {
   }, []);
 
   useEffect(() => {
-    setCountrySelect((prev) => (prev.startsWith("+61__") ? prev : getDefaultCountrySelectValue()));
-  }, []);
+    if (step !== "details") return;
+    setCountrySelect(getDefaultCountrySelectValue());
+  }, [step]);
 
   useEffect(() => {
     getServicesForBooking()
@@ -294,6 +308,30 @@ export default function AppointmentBookingPage() {
     setStep("details");
   }, [authReady, token]);
 
+  useEffect(() => {
+    if (step !== "details") {
+      detailsProfileLoadedRef.current = false;
+      return;
+    }
+    if (!authReady || !token || detailsProfileLoadedRef.current) return;
+    detailsProfileLoadedRef.current = true;
+
+    const mergeProfile = (profile: PublicUser) => {
+      const fromApi = applyProfileToBookingDetails(profile);
+      if (fromApi.name) setName((prev) => prev.trim() || fromApi.name);
+      if (fromApi.email) setEmail((prev) => prev.trim() || fromApi.email);
+      if (fromApi.mobile) setMobile((prev) => prev.trim() || fromApi.mobile);
+    };
+
+    if (user) mergeProfile(user);
+
+    getProfile(token)
+      .then(mergeProfile)
+      .catch(() => {
+        // Keep session cache or manual entry if profile refresh fails.
+      });
+  }, [step, authReady, token, user]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -307,10 +345,6 @@ export default function AppointmentBookingPage() {
     const trimmedEmail = email.trim();
     if (!trimmedName) {
       setError("Please enter your name.");
-      return;
-    }
-    if (!trimmedEmail) {
-      setError("Please enter your email address.");
       return;
     }
     const digits = sanitizeMobileDigits(mobile);
@@ -355,7 +389,7 @@ export default function AppointmentBookingPage() {
     const primary = summaryLines[0];
     const body: BookAppointmentBody = {
       name: trimmedName,
-      email: trimmedEmail,
+      ...(trimmedEmail ? { email: trimmedEmail } : {}),
       mobile: digits,
       countryCode,
       date,
@@ -409,12 +443,11 @@ export default function AppointmentBookingPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h1 className="font-display text-3xl font-semibold text-charcoal mb-1 text-center">
-                See you soon, {name.trim() || "there"}!
+              <h1 className="font-display text-3xl font-semibold text-charcoal mb-3 text-center">
+                Your booking request has been received
               </h1>
-              <p className="text-charcoal/80 font-semibold mb-1 text-center">Thanks for booking with us.</p>
-              <p className="text-gray-600 mb-8 text-center">
-                We&apos;ve sent an email confirmation to your provided email address.
+              <p className="text-gray-600 mb-8 text-center max-w-lg mx-auto leading-relaxed">
+                Our team will get in touch with you shortly to confirm your booking.
               </p>
 
               <div className="grid gap-4 md:grid-cols-[1fr_1.2fr]">
@@ -443,10 +476,6 @@ export default function AppointmentBookingPage() {
                       className="pointer-events-none h-28 w-full border-0 sm:h-32"
                     />
                   </a>
-                  <p className="text-sm text-charcoal/90 font-semibold leading-relaxed">
-                    Your appointment is confirmed! A confirmation has been sent to your contact details.
-                    We look forward to seeing you.
-                  </p>
                 </div>
 
                 <div className="rounded-xl border border-gray-100 bg-gray-50/70 p-4 space-y-3">
@@ -610,14 +639,20 @@ export default function AppointmentBookingPage() {
                   </div>
 
                   <div className="shrink-0 border-t border-amber-100/60 bg-white/80 px-4 py-3 space-y-3">
-                    {summaryLines.length > 0 && (
+                    {summaryLines.length > 0 && (SHOW_SERVICE_PRICING || totalSelectedDurationMinutes > 0) && (
                       <div className="flex justify-between items-center text-sm">
                         <span className="text-gray-500">
-                          {totalSelectedDurationMinutes > 0 ? `Est. ${totalSelectedDurationMinutes} mins` : "Est. total"}
+                          {totalSelectedDurationMinutes > 0
+                            ? `Est. ${totalSelectedDurationMinutes} mins`
+                            : SHOW_SERVICE_PRICING
+                              ? "Est. total"
+                              : ""}
                         </span>
-                        <span className="font-semibold text-charcoal">
-                          {fmtAudBooking.format(summaryLines.reduce((s, r) => s + r.price, 0))}
-                        </span>
+                        {SHOW_SERVICE_PRICING ? (
+                          <span className="font-semibold text-charcoal">
+                            {fmtAudBooking.format(summaryLines.reduce((s, r) => s + r.price, 0))}
+                          </span>
+                        ) : null}
                       </div>
                     )}
                     {error ? <p className="text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">{error}</p> : null}
@@ -739,24 +774,22 @@ export default function AppointmentBookingPage() {
                     placeholder="e.g. 412 345 678"
                     helperText="We may call or text about this appointment."
                     borderTone="black"
-                    lockToDialCode="+61"
                   />
 
                   <div>
                     <label htmlFor="appt-email" className="mb-1.5 block text-sm font-semibold text-charcoal">
-                      Email <span className="text-amber-500">*</span>
+                      Email <span className="font-normal text-gray-400">(optional)</span>
                     </label>
                     <input
                       id="appt-email"
                       type="email"
-                      required
                       autoComplete="email"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="w-full rounded-xl border border-gray-200 px-4 py-3 text-[15px] text-charcoal transition-shadow placeholder:text-gray-400 focus:border-amber-400 focus:outline-none focus:ring-2 focus:ring-amber-400/30"
                       placeholder="your@email.com"
                     />
-                    <p className="mt-1.5 text-xs text-gray-500">Confirmation and updates will be sent here.</p>
+                    <p className="mt-1.5 text-xs text-gray-500">Optional — we&apos;ll send booking updates here if provided.</p>
                   </div>
 
                   <div>
@@ -778,7 +811,7 @@ export default function AppointmentBookingPage() {
                     disabled={submitting}
                     className="w-full rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 py-3 text-sm font-bold tracking-wide text-white shadow-lg shadow-amber-500/25 transition-all hover:from-amber-600 hover:to-amber-700 disabled:opacity-60"
                   >
-                    {submitting ? "Sending request…" : "Request appointment"}
+                    {submitting ? "Sending…" : "Send booking request"}
                   </button>
                 </form>
 

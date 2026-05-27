@@ -1,8 +1,8 @@
 "use client";
 
-import { useId } from "react";
+import { useEffect, useId, useMemo } from "react";
 import { MOBILE_DIGITS_LEN, sanitizeMobileDigits } from "@/lib/mobileInput";
-import { getCountryDialOptions } from "@/lib/countryDialCodes";
+import { getCountryDialOptions, getDefaultCountrySelectValue } from "@/lib/countryDialCodes";
 
 type Props = {
   id: string;
@@ -23,6 +23,8 @@ type Props = {
   borderTone?: "amber" | "black";
   /** Restrict country select to one dial code (e.g. `+61`). */
   lockToDialCode?: string;
+  /** When the select value is missing/invalid, fall back to this dial (default Australia +61). */
+  defaultDialCode?: string;
   /** Custom class for the label. */
   labelClassName?: string;
 };
@@ -41,6 +43,7 @@ export default function PhoneCountryField({
   showDigitMeter = false,
   borderTone = "amber",
   lockToDialCode,
+  defaultDialCode = "+61",
   labelClassName = "block text-sm font-medium text-charcoal mb-2",
 }: Props) {
   const hintId = useId();
@@ -63,9 +66,29 @@ export default function PhoneCountryField({
     ? allOptions.filter((o) => o.dial === lockToDialCode)
     : allOptions;
   const selectOptions = filteredOptions.length ? filteredOptions : allOptions;
+
+  const resolvedCountrySelect = useMemo(() => {
+    const exact = selectOptions.find((o) => o.value === countrySelect);
+    if (exact) return exact.value;
+    const dial = lockToDialCode ?? defaultDialCode;
+    const au =
+      dial === "+61"
+        ? selectOptions.find((o) => o.value.startsWith("+61__AU__"))
+        : undefined;
+    const byDial = au ?? selectOptions.find((o) => o.dial === dial);
+    return byDial?.value ?? getDefaultCountrySelectValue();
+  }, [countrySelect, defaultDialCode, lockToDialCode, selectOptions]);
+
+  useEffect(() => {
+    if (lockToDialCode || resolvedCountrySelect === countrySelect) return;
+    onCountryChange(resolvedCountrySelect);
+  }, [countrySelect, lockToDialCode, onCountryChange, resolvedCountrySelect]);
+
   const forcedValue = lockToDialCode
-    ? selectOptions.find((o) => o.value === countrySelect)?.value ?? selectOptions[0]?.value ?? countrySelect
-    : countrySelect;
+    ? selectOptions.find((o) => o.value === resolvedCountrySelect)?.value ??
+      selectOptions[0]?.value ??
+      resolvedCountrySelect
+    : resolvedCountrySelect;
   const isSelectLocked = Boolean(lockToDialCode);
 
   return (
