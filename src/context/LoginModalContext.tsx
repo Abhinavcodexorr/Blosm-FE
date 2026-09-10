@@ -120,15 +120,11 @@ export function LoginModalProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener(AUTH_EXPIRED_EVENT, onAuthExpired);
   }, [router, setAuth, setRedirectAfterLoginSafe]);
 
-  const handleBookNow = useCallback(
-    (serviceName?: string) => {
-      if (typeof window !== "undefined" && serviceName) {
-        sessionStorage.setItem("selectedService", serviceName);
-      }
-      router.push("/appointment");
-    },
-    [router]
-  );
+  const handleBookNow = useCallback(() => {
+    if (typeof window !== "undefined") {
+      window.location.href = "https://blosmhairandbeauty.gettimely.com/";
+    }
+  }, []);
 
   return (
     <LoginModalContext.Provider

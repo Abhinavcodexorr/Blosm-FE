@@ -72,6 +72,10 @@ function applyProfileToBookingDetails(profile: PublicUser) {
 }
 
 export default function AppointmentBookingPage() {
+  useEffect(() => {
+    window.location.replace("https://blosmhairandbeauty.gettimely.com/");
+  }, []);
+
   const { token, authReady, user, openLogin, setRedirectAfterLogin } = useLoginModal();
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");

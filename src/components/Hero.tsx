@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import BlosmLogo from "./BlosmLogo";
 
 // Unsplash - verified salon/beauty photos (woman at salon, hair styling, salon interior)
 const heroImages = [
@@ -64,12 +65,14 @@ export default function Hero() {
           Where elegance meets expertise. Experience transformative beauty in a sanctuary designed exclusively for women.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
-          <Link
-            href="/services"
+          <a
+            href="https://blosmhairandbeauty.gettimely.com/"
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 bg-amber-500 text-white font-medium tracking-wide hover:bg-amber-600 transition-all duration-300 shadow-lg hover:shadow-amber-500/30"
           >
             Book Appointment
-          </Link>
+          </a>
           <Link
             href="/services"
             className="inline-flex items-center justify-center gap-2 px-10 py-4 border-2 border-white/80 text-white font-medium tracking-wide hover:bg-white/10 transition-all duration-300"

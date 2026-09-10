@@ -13,7 +13,15 @@ const root = path.join(__dirname, "..");
 const nextBin = path.join(root, "node_modules", "next", "dist", "bin", "next");
 const passThrough = process.argv.slice(2);
 const hasPortFlag = passThrough.some((a) => a === "-p" || a === "--port" || a.startsWith("--port="));
-const args = [nextBin, "dev", "--turbo", ...(hasPortFlag ? [] : ["-p", "3000"]), ...passThrough];
+const hasHostFlag = passThrough.some((a) => a === "-H" || a === "--hostname" || a.startsWith("--hostname="));
+const args = [
+  nextBin,
+  "dev",
+  "--turbo",
+  ...(hasHostFlag ? [] : ["-H", "0.0.0.0"]),
+  ...(hasPortFlag ? [] : ["-p", "3000"]),
+  ...passThrough
+];
 
 /** Same as `npm run dev` — forces Turbopack even if argv parsing ever regresses on Windows. */
 const child = spawn(process.execPath, args, {

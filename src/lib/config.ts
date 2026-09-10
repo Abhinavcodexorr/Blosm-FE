@@ -7,3 +7,7 @@ export const API_BASE_URL =
 
 /** When false, service/menu prices are hidden across the public site and booking UI. */
 export const SHOW_SERVICE_PRICING = false;
+
+/** Direct booking external URL */
+export const TIMELY_BOOKING_URL = "https://blosmhairandbeauty.gettimely.com/";
+

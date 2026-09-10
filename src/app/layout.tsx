@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Cormorant_Garamond, DM_Sans } from 'next/font/google'
 import './globals.css'
 import Providers from '@/components/Providers'
+import FacebookPixel from '@/components/FacebookPixel'
 
 const cormorant = Cormorant_Garamond({
   subsets: ['latin'],
@@ -37,6 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${cormorant.variable} ${dmSans.variable}`}>
       <body className="antialiased font-sans">
+        <FacebookPixel />
         <Providers>{children}</Providers>
       </body>
     </html>
